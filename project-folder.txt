@@ -1,0 +1,42 @@
+noventis/
+├── examples/
+│   ├── basic_usage.py
+│   ├── data_cleaning_pipeline.py
+|
+├── noventis/
+│   ├── __init__.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   └── exceptions.py
+│   ├── data_cleaning/
+│   │   ├── __init__.py
+│   │   ├── null_handling.py
+│   │   ├── outlier_handling.py
+│   │   ├── Encoding.py
+│   │   ├──  Scaling.py
+│   │   └── exceptions.py
+│   │   
+│   ├── predictor/
+│   │   ├── __init__.py
+│   │   
+│   ├── autoeda/
+│   │   ├── __init__.py
+│   │ 
+│   └── utils/
+│       ├── __init__.py
+│       ├── helpers.py
+│       └── constants.py
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── test_null_handling/
+│       ├── __init__.py
+│       ├── test_detection.py
+│       ├── test_imputation.py
+│       └── test_validation.py
+├── .gitignore
+├── requirements.txt
+├── README.md
+├── LICENSE
+├── MANIFEST.in
