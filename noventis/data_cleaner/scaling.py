@@ -16,7 +16,7 @@ list_scaler = {
 
 SKEWNESS_THRESHOLD = 2.0     
 NORMALITY_ALPHA = 0.05
-OUTLIER_THRESHOLD = 2.0
+OUTLIER_THRESHOLD = 0.01
 
 OUTLIER_RESISTANT = ['robust', 'power']
 BOUNDED_OUTPUT = ['minmax']
@@ -53,8 +53,6 @@ def analyze_data(data):
 
     analysis['outlier_ratio'] = outliers / len(clean_data)
     analysis['has_outliers'] = analysis['outlier_ratio'] > OUTLIER_THRESHOLD
-
-    analysis['has_outliers'] = outliers > 0
 
     # check if all the data is strictly positive (x > 0)
     analysis['is_positive_only'] = np.all(clean_data > 0)
@@ -140,7 +138,7 @@ class NoventisScaler:
         """
         # check valid methods
         allowed_methods = ['standard', 'minmax', 'robust', 'power']
-        if method not in allowed_methods:
+        if method not in allowed_methods and method != None:
             raise ValueError(f"Invalid method. Allowed methods are: {allowed_methods}")
 
         self.method = method
