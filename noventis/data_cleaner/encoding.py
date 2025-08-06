@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-# Mengganti TargetEncoder dari category_encoders dengan versi scikit-learn
+# Using scikit-learn's TargetEncoder with correct parameters
 from sklearn.preprocessing import LabelEncoder, TargetEncoder 
 # Encoder lain tetap dari category_encoders untuk saat ini
 from category_encoders import OrdinalEncoder, BinaryEncoder, HashingEncoder
@@ -32,12 +32,9 @@ class NoventisEncoder:
                  target_column: Optional[str] = None, 
                  columns_to_encode: Optional[List[str]] = None, 
                  category_mapping: Optional[Dict[str, Dict]] = None,
-                 cv_folds: int = 5,
-                 smooth: float = 'auto', # Mengganti 'smoothing' menjadi 'smooth' untuk scikit-learn
-                 # Parameter berikut tidak digunakan oleh sklearn.preprocessing.TargetEncoder
-                 # min_samples_leaf: int = 1,
-                 # noise_level: float = 0.01,
-                 # handle_unknown: str = 'error',
+                 cv: int = 5,  # Changed from cv_folds to cv
+                 smooth: Union[float, str] = 'auto',
+                 target_type: str = 'auto',  # Added target_type parameter
                  verbose: bool = True):
         """
         Initializes the Advanced NoventisEncoder.
@@ -47,16 +44,18 @@ class NoventisEncoder:
             target_column (str, optional): Target variable column name
             columns_to_encode (list, optional): Specific columns to encode
             category_mapping (dict, optional): Custom mapping for ordinal encoding
-            cv_folds (int): Number of cross-validation folds for target encoding
-            smooth (float or 'auto'): Smoothing parameter for target encoding.
+            cv (int): Number of cross-validation folds for target encoding
+            smooth (float or 'auto'): Smoothing parameter for target encoding
+            target_type (str): Type of target ('auto', 'binary', 'continuous')
             verbose (bool): Whether to print detailed information
         """
         self.method = method
         self.target_column = target_column
         self.columns_to_encode = columns_to_encode
         self.category_mapping = category_mapping
-        self.cv_folds = cv_folds
+        self.cv = cv
         self.smooth = smooth
+        self.target_type = target_type
         self.verbose = verbose
         
         # Internal state
@@ -78,8 +77,8 @@ class NoventisEncoder:
         if self.method in ['auto', 'target'] and self.target_column is None:
             raise ValueError(f"target_column is required for method '{self.method}'")
         
-        if self.cv_folds < 2:
-            raise ValueError("cv_folds must be at least 2")
+        if self.cv < 2:
+            raise ValueError("cv must be at least 2")
 
     def _cramers_v(self, x: pd.Series, y: pd.Series) -> float:
         """
@@ -171,6 +170,24 @@ class NoventisEncoder:
             elif memory_impact < 50: return 'ohe'
             else: return 'binary'
         return 'label'
+    
+    def _determine_target_type(self, y: pd.Series) -> str:
+        """Determine the target type for TargetEncoder."""
+        if self.target_type != 'auto':
+            return self.target_type
+        
+        # Auto-detect target type
+        if pd.api.types.is_numeric_dtype(y):
+            if y.nunique() <= 2:
+                return 'binary'
+            else:
+                return 'continuous'
+        else:
+            # For categorical targets, treat as binary if 2 classes, otherwise continuous
+            if y.nunique() <= 2:
+                return 'binary'
+            else:
+                return 'continuous'
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
         if not isinstance(X, pd.DataFrame):
@@ -216,8 +233,13 @@ class NoventisEncoder:
                 encoder = LabelEncoder()
                 encoder.fit(X[col].astype(str).fillna('missing'))
             elif encoding_method == 'target':
-                target_type = 'binary' if y.nunique() <= 2 else 'continuous'
-                encoder = TargetEncoder(cv=self.cv_folds, smooth=self.smooth, target_type=target_type)
+                # Use scikit-learn's TargetEncoder with correct parameters
+                target_type = self._determine_target_type(y)
+                encoder = TargetEncoder(
+                    cv=self.cv,
+                    smooth=self.smooth,
+                    target_type=target_type
+                )
                 encoder.fit(X[[col]], y)
             elif encoding_method == 'binary':
                 encoder = BinaryEncoder()
@@ -251,8 +273,13 @@ class NoventisEncoder:
                 encoder = LabelEncoder()
                 encoder.fit(X[col].astype(str).fillna('missing'))
             elif self.method == 'target':
-                target_type = 'binary' if y.nunique() <= 2 else 'continuous'
-                encoder = TargetEncoder(cv=self.cv_folds, smooth=self.smooth, target_type=target_type)
+                # Use scikit-learn's TargetEncoder with correct parameters
+                target_type = self._determine_target_type(y)
+                encoder = TargetEncoder(
+                    cv=self.cv,
+                    smooth=self.smooth,
+                    target_type=target_type
+                )
                 encoder.fit(X[[col]], y)
             elif self.method == 'ordinal':
                 if self.category_mapping is None or col not in self.category_mapping:
@@ -290,7 +317,9 @@ class NoventisEncoder:
                     df = pd.concat([df, ohe_df], axis=1)
                     transformed_cols.extend(ohe_df.columns.tolist())
                 elif method == 'target':
-                    df[f'{col}_target_encoded'] = self.encoders[col].transform(df[[col]])
+                    # Use the fitted TargetEncoder
+                    encoded_values = self.encoders[col].transform(df[[col]])
+                    df[f'{col}_target_encoded'] = encoded_values
                     transformed_cols.append(f'{col}_target_encoded')
                 elif method == 'ordinal':
                     encoded_df = self.encoders[col].transform(df[[col]])
