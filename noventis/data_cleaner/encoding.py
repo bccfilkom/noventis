@@ -3,7 +3,6 @@ import numpy as np
 # Using scikit-learn's TargetEncoder with correct parameters
 from sklearn.preprocessing import LabelEncoder, TargetEncoder 
 # Encoder lain tetap dari category_encoders untuk saat ini
-from category_encoders import OrdinalEncoder, BinaryEncoder, HashingEncoder
 from scipy.stats import chi2_contingency
 from typing import Dict, List, Optional, Union, Tuple
 import warnings
