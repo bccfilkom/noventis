@@ -8,10 +8,10 @@ class NoventisOutlierHandler:
     Menangani outlier pada kolom numerik DataFrame dengan cerdas menggunakan
     metode class-based yang konsisten dengan Scikit-Learn.
 
-    Mendukung metode 'auto', 'trim', 'winsorize', 'iqr', dan 'none'.
-    Metode 'trim' dan 'iqr' akan mengidentifikasi semua baris outlier dari
-    semua kolom yang relevan terlebih dahulu, lalu menghapusnya dalam
-    satu operasi pada tahap transform.
+    Mendukung metode 'auto', 'quantile_trim', 'iqr_trim', 'winsorize', dan 'none'.
+    Metode 'quantile_trim' dan 'iqr_trim' akan mengidentifikasi semua baris 
+    outlier dari semua kolom yang relevan terlebih dahulu, lalu menghapusnya
+    dalam satu operasi pada tahap transform.
     """
 
     def __init__(self,
@@ -26,10 +26,10 @@ class NoventisOutlierHandler:
 
         Args:
             feature_method_map (dict, optional): Peta untuk metode spesifik per kolom.
-            default_method (str): Metode fallback ('auto', 'trim', 'winsorize', 'iqr', 'none').
-            iqr_multiplier (float): Pengali untuk metode 'iqr'.
-            quantile_range (tuple): Batas kuantil untuk 'trim' dan 'winsorize'.
-            min_data_threshold (int): Batas data untuk metode 'auto' memilih 'iqr'.
+            default_method (str): Metode fallback ('auto', 'quantile_trim', 'iqr_trim', 'winsorize', 'none'). 
+            iqr_multiplier (float): Pengali untuk metode 'iqr_trim'. 
+            quantile_range (tuple): Batas kuantil untuk 'quantile_trim' dan 'winsorize'. 
+            min_data_threshold (int): Batas data untuk metode 'auto' memilih 'iqr_trim'. 
             skew_threshold (float): Batas skewness untuk metode 'auto'.
         """
         self.feature_method_map = feature_method_map or {}
@@ -47,21 +47,15 @@ class NoventisOutlierHandler:
     def _choose_auto_method(self, col_data: pd.Series) -> str:
         """Fungsi helper untuk memilih metode otomatis."""
         if len(col_data.dropna()) < self.min_data_threshold:
-            return 'iqr'
+            return 'iqr_trim' 
         elif abs(skew(col_data.dropna())) > self.skew_threshold:
             return 'winsorize'
         else:
-            return 'trim'
+            return 'quantile_trim' 
 
     def fit(self, X: pd.DataFrame, y=None) -> 'NoventisOutlierHandler':
         """
         Mempelajari batas outlier dari data training X.
-
-        Args:
-            X (pd.DataFrame): DataFrame input untuk dipelajari.
-
-        Returns:
-            self: instance yang sudah di-fit.
         """
         df = X.copy()
         self.boundaries_ = {}
@@ -69,6 +63,10 @@ class NoventisOutlierHandler:
         self.indices_to_drop_ = set()
 
         for col in df.select_dtypes(include=np.number).columns:
+            # Penanganan edge case jika kolom tidak bervariasi
+            if df[col].nunique() <= 1: 
+                continue               
+
             method = self.feature_method_map.get(col, self.default_method)
             if method == 'auto':
                 method = self._choose_auto_method(df[col])
@@ -79,10 +77,10 @@ class NoventisOutlierHandler:
                 continue
 
             lower_bound, upper_bound = None, None
-            if method in ['trim', 'winsorize']:
+            if method in ['quantile_trim', 'winsorize']: 
                 q_low, q_high = df[col].quantile(self.quantile_range)
                 lower_bound, upper_bound = q_low, q_high
-            elif method == 'iqr':
+            elif method == 'iqr_trim': 
                 Q1 = df[col].quantile(0.25)
                 Q3 = df[col].quantile(0.75)
                 IQR = Q3 - Q1
@@ -91,7 +89,7 @@ class NoventisOutlierHandler:
 
             self.boundaries_[col] = (lower_bound, upper_bound)
 
-            if method in ['trim', 'iqr']:
+            if method in ['quantile_trim', 'iqr_trim']:
                 outlier_indices = df.index[(df[col] < lower_bound) | (df[col] > upper_bound)]
                 self.indices_to_drop_.update(outlier_indices)
         
@@ -101,12 +99,6 @@ class NoventisOutlierHandler:
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
         Menerapkan penanganan outlier ke DataFrame.
-
-        Args:
-            X (pd.DataFrame): DataFrame yang akan ditransformasi.
-
-        Returns:
-            pd.DataFrame: DataFrame yang telah bersih dari outlier.
         """
         if not self.is_fitted_:
             raise RuntimeError("Handler harus di-fit terlebih dahulu sebelum transform.")
@@ -114,12 +106,18 @@ class NoventisOutlierHandler:
         df_out = X.copy()
 
         for col, method in self.methods_.items():
+            # Pengecekan robustness jika kolom tidak ada di data transform
+            if col not in df_out.columns: 
+                continue                  
+            
             if method == 'winsorize':
                 lower_bound, upper_bound = self.boundaries_[col]
                 df_out[col] = np.clip(df_out[col], lower_bound, upper_bound)
 
         if self.indices_to_drop_:
-            df_out.drop(index=list(self.indices_to_drop_), inplace=True, errors='ignore')
+            # Pastikan hanya drop indeks yang ada di dataframe saat ini
+            indices_in_df = self.indices_to_drop_.intersection(df_out.index) 
+            df_out.drop(index=list(indices_in_df), inplace=True) 
             
         return df_out
 
