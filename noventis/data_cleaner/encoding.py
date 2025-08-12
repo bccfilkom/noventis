@@ -1,13 +1,12 @@
 import pandas as pd
 import numpy as np
-# Using scikit-learn's TargetEncoder with correct parameters
 from sklearn.preprocessing import LabelEncoder, TargetEncoder 
-# Encoder lain tetap dari category_encoders untuk saat ini
 from scipy.stats import chi2_contingency
 from typing import Dict, List, Optional, Union, Tuple
 import warnings
 from collections import defaultdict
 import logging
+from category_encoders import OrdinalEncoder, BinaryEncoder, HashingEncoder
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -230,7 +229,11 @@ class NoventisEncoder:
             
             if encoding_method == 'label':
                 encoder = LabelEncoder()
+
                 encoder.fit(X[col].astype(str).fillna('missing'))
+            elif encoding_method == 'ohe':
+                encoder = "ohe_placeholder" 
+
             elif encoding_method == 'target':
                 # Use scikit-learn's TargetEncoder with correct parameters
                 target_type = self._determine_target_type(y)
@@ -240,9 +243,11 @@ class NoventisEncoder:
                     target_type=target_type
                 )
                 encoder.fit(X[[col]], y)
+
             elif encoding_method == 'binary':
                 encoder = BinaryEncoder()
                 encoder.fit(X[col])
+
             elif encoding_method == 'hashing':
                 n_components = min(8, max(4, int(np.log2(info['unique_count']))))
                 encoder = HashingEncoder(n_components=n_components)
@@ -271,6 +276,10 @@ class NoventisEncoder:
             if self.method == 'label':
                 encoder = LabelEncoder()
                 encoder.fit(X[col].astype(str).fillna('missing'))
+
+            elif self.method == 'ohe':
+                encoder = "ohe_placeholder"
+
             elif self.method == 'target':
                 # Use scikit-learn's TargetEncoder with correct parameters
                 target_type = self._determine_target_type(y)
@@ -280,14 +289,17 @@ class NoventisEncoder:
                     target_type=target_type
                 )
                 encoder.fit(X[[col]], y)
+
             elif self.method == 'ordinal':
                 if self.category_mapping is None or col not in self.category_mapping:
                     raise ValueError(f"Mapping for '{col}' not found.")
                 encoder = OrdinalEncoder(mapping=[{'col': col, 'mapping': self.category_mapping[col]}])
                 encoder.fit(X[[col]])
+
             elif self.method == 'binary':
                 encoder = BinaryEncoder()
                 encoder.fit(X[col])
+                
             elif self.method == 'hashing':
                 encoder = HashingEncoder(n_components=min(8, max(4, int(np.log2(X[col].nunique())))))
                 encoder.fit(X[col])
