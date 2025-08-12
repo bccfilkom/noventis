@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import LabelEncoder, TargetEncoder 
+from sklearn.preprocessing import LabelEncoder, TargetEncoder , OneHotEncoder
 from scipy.stats import chi2_contingency
 from typing import Dict, List, Optional, Union, Tuple
 import warnings
@@ -232,7 +232,8 @@ class NoventisEncoder:
 
                 encoder.fit(X[col].astype(str).fillna('missing'))
             elif encoding_method == 'ohe':
-                encoder = "ohe_placeholder" 
+                encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+                encoder.fit(X[[col]].fillna('missing'))
 
             elif encoding_method == 'target':
                 # Use scikit-learn's TargetEncoder with correct parameters
@@ -278,7 +279,8 @@ class NoventisEncoder:
                 encoder.fit(X[col].astype(str).fillna('missing'))
 
             elif self.method == 'ohe':
-                encoder = "ohe_placeholder"
+                encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+                encoder.fit(X[[col]].fillna('missing'))
 
             elif self.method == 'target':
                 # Use scikit-learn's TargetEncoder with correct parameters
@@ -324,9 +326,10 @@ class NoventisEncoder:
                     df[f'{col}_encoded'] = self.encoders[col].transform(df[col].astype(str).fillna('missing'))
                     transformed_cols.append(f'{col}_encoded')
                 elif method == 'ohe':
-                    ohe_df = pd.get_dummies(df[col], prefix=col, dummy_na=True)
+                    encoded_array = encoder.transform(df[[col]].fillna('missing'))
+                    new_cols = encoder.get_feature_names_out([col])
+                    ohe_df = pd.DataFrame(encoded_array, columns=new_cols, index=df.index)
                     df = pd.concat([df, ohe_df], axis=1)
-                    transformed_cols.extend(ohe_df.columns.tolist())
                 elif method == 'target':
                     # Use the fitted TargetEncoder
                     encoded_values = self.encoders[col].transform(df[[col]])
