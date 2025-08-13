@@ -252,43 +252,35 @@ class NoventisScaler:
                 }
         self.quality_report_ = report
         return self.quality_report_
-        
-    def plot_comparison(self, max_cols: int = 5):
-        """
-        Membuat visualisasi perbandingan distribusi data sebelum dan sesudah scaling.
-        """
-        if not self.is_fitted_ or self._original_df_snapshot is None:
-            print("Scaler belum di-fit. Jalankan .fit() atau .fit_transform() terlebih dahulu.")
-            return
 
-        print("Membuat visualisasi perbandingan untuk scaling...")
-        
+
+    def plot_comparison(self, max_cols: int = 1):
+        if not self.is_fitted_ or self._original_df_snapshot is None: return
+        cols_to_plot = list(self.scalers_.keys())[:max_cols]
+        if not cols_to_plot: return
+
         original_data = self._original_df_snapshot
         transformed_data = self.transform(original_data.copy())
+        col = cols_to_plot[0]
         
-        cols_to_plot = list(self.scalers_.keys())[:max_cols]
+        # Membuat 2x2 grid untuk plot
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+        fig.suptitle(f"Perbandingan Scaler untuk Kolom '{col}' (Metode: {self.fitted_methods_[col].upper()})", fontsize=16)
 
-        for col in cols_to_plot:
-            if col not in transformed_data.columns:
-                continue
-                
-            fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-            fig.suptitle(f"Perbandingan Distribusi untuk Kolom '{col}' (Metode: {self.fitted_methods_[col].upper()})", fontsize=16)
+        # Sebelum Scaling
+        sns.histplot(original_data[col], kde=True, ax=axes[0, 0], color='skyblue')
+        axes[0, 0].set_title("Sebelum: Distribusi Histogram")
+        stats.probplot(original_data[col].dropna(), dist="norm", plot=axes[0, 1])
+        axes[0, 1].set_title("Sebelum: Q-Q Plot vs Normal")
 
-            # Plot Sebelum
-            sns.histplot(original_data[col], kde=True, ax=axes[0], color='skyblue')
-            axes[0].set_title(f"Sebelum Scaling")
-            axes[0].axvline(original_data[col].mean(), color='r', linestyle='--', label=f"Mean: {original_data[col].mean():.2f}")
-            axes[0].legend()
+        # Sesudah Scaling
+        sns.histplot(transformed_data[col], kde=True, ax=axes[1, 0], color='lightgreen')
+        axes[1, 0].set_title("Sesudah: Distribusi Histogram")
+        stats.probplot(transformed_data[col].dropna(), dist="norm", plot=axes[1, 1])
+        axes[1, 1].set_title("Sesudah: Q-Q Plot vs Normal")
 
-            # Plot Sesudah
-            sns.histplot(transformed_data[col], kde=True, ax=axes[1], color='lightgreen')
-            axes[1].set_title(f"Sesudah Scaling")
-            axes[1].axvline(transformed_data[col].mean(), color='r', linestyle='--', label=f"Mean: {transformed_data[col].mean():.2f}")
-            axes[1].legend()
-
-            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-            plt.show()
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        return fig
 
     def print_quality_report(self):
 

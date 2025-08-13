@@ -203,26 +203,22 @@ class NoventisImputer:
             return {}
         return self.quality_report_
 
-    def plot_comparison(self, max_cols: int = 5):
-        """
-        Membuat visualisasi perbandingan distribusi data sebelum dan sesudah imputasi.
-        Hanya akan memvisualisasikan kolom numerik yang diimputasi.
 
-        Args:
-            max_cols (int): Jumlah maksimum kolom yang akan divisualisasikan.
+    def plot_comparison(self, max_cols: int = 1):
+        """
+        Membuat visualisasi perbandingan sebelum dan sesudah imputasi,
+        termasuk heatmap data hilang dan perbandingan distribusi.
         """
         if not self.is_fitted_ or self._original_df_snapshot is None:
-            print("Imputer belum di-fit. Jalankan .fit() atau .fit_transform() terlebih dahulu.")
             return
 
-        print("Membuat visualisasi perbandingan untuk imputasi...")
-        
         original_data = self._original_df_snapshot
+        # Kita perlu memanggil transform lagi di sini untuk mendapatkan data versi 'after'
         transformed_data = self.transform(original_data.copy())
-        
-        # Ambil hanya kolom numerik yang diproses untuk di-plot
+
+        # Ambil kolom numerik yang diproses untuk perbandingan distribusi
         numeric_cols_processed = [
-            col for col in self.columns_to_process_ 
+            col for col in self.columns_to_process_
             if pd.api.types.is_numeric_dtype(original_data[col])
         ][:max_cols]
 
@@ -230,23 +226,27 @@ class NoventisImputer:
             print("Tidak ada kolom numerik yang diimputasi untuk divisualisasikan.")
             return
 
-        for col in numeric_cols_processed:
-            fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-            fig.suptitle(f"Perbandingan Distribusi untuk Kolom '{col}'", fontsize=16)
+        col_to_plot = numeric_cols_processed[0]
 
-            # Plot Sebelum (hanya plot nilai yang tidak null)
-            sns.histplot(original_data[col].dropna(), kde=True, ax=axes[0], color='skyblue')
-            axes[0].set_title(f"Sebelum (Distribusi Nilai Asli)")
-            axes[0].axvline(original_data[col].mean(), color='r', linestyle='--', label='Mean')
-            axes[0].axvline(original_data[col].median(), color='g', linestyle='-', label='Median')
-            axes[0].legend()
+        # Buat grid plot 2x2
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10), gridspec_kw={'height_ratios': [1, 2]})
+        fig.suptitle(f"Perbandingan Imputasi untuk Kolom '{col_to_plot}'", fontsize=16)
 
-            # Plot Sesudah (plot semua nilai setelah imputasi)
-            sns.histplot(transformed_data[col], kde=True, ax=axes[1], color='lightgreen')
-            axes[1].set_title(f"Sesudah (Distribusi Setelah Imputasi)")
-            axes[1].axvline(transformed_data[col].mean(), color='r', linestyle='--', label='Mean')
-            axes[1].axvline(transformed_data[col].median(), color='g', linestyle='-', label='Median')
-            axes[1].legend()
+        # 1. Heatmap Sebelum Imputasi
+        sns.heatmap(original_data.isnull(), cbar=False, ax=axes[0, 0], cmap='viridis')
+        axes[0, 0].set_title("Sebelum: Lokasi Data Hilang (Kuning)")
+        
+        # 2. Distribusi Sebelum Imputasi
+        sns.histplot(original_data[col_to_plot].dropna(), kde=True, ax=axes[1, 0], color='skyblue')
+        axes[1, 0].set_title(f"Sebelum: Distribusi '{col_to_plot}'")
 
-            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-            plt.show()
+        # 3. Heatmap Sesudah Imputasi
+        sns.heatmap(transformed_data.isnull(), cbar=False, ax=axes[0, 1], cmap='viridis')
+        axes[0, 1].set_title("Sesudah: Tidak Ada Data Hilang")
+
+        # 4. Distribusi Sesudah Imputasi
+        sns.histplot(transformed_data[col_to_plot], kde=True, ax=axes[1, 1], color='lightgreen')
+        axes[1, 1].set_title(f"Sesudah: Distribusi '{col_to_plot}'")
+
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        return fig

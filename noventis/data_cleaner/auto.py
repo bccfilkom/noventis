@@ -2,10 +2,34 @@ import pandas as pd
 import numpy as np
 from typing import Union, Optional, Tuple
 
+from IPython.display import HTML
+
 from .scaling import NoventisScaler
 from .encoding import NoventisEncoder
 from .imputing import NoventisImputer
 from .outlier_handling import NoventisOutlierHandler
+from .data_quality import assess_data_quality
+
+
+import io
+import base64
+
+def plot_to_base64(fig):
+    """Mengonversi figure Matplotlib menjadi string Base64 untuk disisipkan di HTML."""
+    if fig is None:
+        return ""
+    # Membuat buffer di memori
+    buf = io.BytesIO()
+    # Menyimpan plot ke buffer dalam format PNG
+    fig.savefig(buf, format='png', bbox_inches='tight')
+    # Kembali ke awal buffer
+    buf.seek(0)
+    # Encode buffer ke Base64 dan ubah menjadi string
+    img_str = base64.b64encode(buf.read()).decode('utf-8')
+    # Tutup buffer
+    buf.close()
+    # Kembalikan string dengan format yang bisa dibaca tag <img> HTML
+    return f"data:image/png;base64,{img_str}"
 
 class NoventisDataCleaner:
     """
@@ -266,8 +290,150 @@ class NoventisDataCleaner:
         if self.encoder_ and hasattr(self.encoder_, 'plot_comparison'):
             # Encoder plot needs the original data before transformation
             self.encoder_.plot_comparison(self._original_df, max_cols=max_cols)
-        if self.scaler_ and hasattr(self.scaler_, 'plot_comparison'):
-            self.scaler_.plot_comparison(max_cols=max_cols)
+            if self.scaler_ and hasattr(self.scaler_, 'plot_comparison'):
+                self.scaler_.plot_comparison(max_cols=max_cols)
+
+
+    
+    def generate_html_report(self):
+        """
+        Menghasilkan dan menampilkan laporan visual HTML interaktif yang lengkap,
+        dengan JavaScript yang andal untuk lingkungan Jupyter Notebook.
+        """
+        if not self.is_fitted_ or self._original_df is None:
+            print("Cleaner has not been run. Execute .fit_transform() first.")
+            return
+
+        # --- Bagian pengumpulan data dan plot tetap sama ---
+        overview_stats = assess_data_quality(self._original_df)
+        overview_html = f"""
+            <div class="overview-grid">
+                <div class="stat-card"><h3>Total Baris</h3><p>{len(self._original_df)}</p></div>
+                <div class="stat-card"><h3>Total Kolom</h3><p>{len(self._original_df.columns)}</p></div>
+                <div class="stat-card"><h3>Kelengkapan Data</h3><p>{overview_stats['completeness']['score']}</p></div>
+                <div class="stat-card"><h3>Kualitas Outlier</h3><p>{overview_stats['outlier_quality']['score']}</p></div>
+                <div class="stat-card"><h3>Kualitas Distribusi</h3><p>{overview_stats['distribution_quality']['score']}</p></div>
+                <div class="stat-card"><h3>Kemurnian Tipe Data</h3><p>{overview_stats['datatype_purity']['score']}</p></div>
+            </div>
+            <div class="df-preview">
+                <h4>Pratinjau 5 Baris Data Asli:</h4>
+                {self._original_df.head().to_html(classes='styled-table')}
+            </div>
+        """
+        imputer_fig = self.imputer_.plot_comparison(max_cols=1) if self.imputer_ else None
+        outlier_fig = self.outlier_handler_.plot_comparison(max_cols=1) if self.outlier_handler_ else None
+        scaler_fig = self.scaler_.plot_comparison(max_cols=1) if self.scaler_ else None
+        encoder_fig = self.encoder_.plot_comparison(self._original_df, max_cols=1) if self.encoder_ else None
+        imputer_plot_b64 = plot_to_base64(imputer_fig)
+        outlier_plot_b64 = plot_to_base64(outlier_fig)
+        scaler_plot_b64 = plot_to_base64(scaler_fig)
+        encoder_plot_b64 = plot_to_base64(encoder_fig)
+
+        # --- Template HTML Final dengan Perbaikan JavaScript ---
+        html_template = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Noventis - Data Cleaning Report</title>
+            <style>
+                /* CSS tetap sama seperti sebelumnya */
+                @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Exo+2:wght@700&display=swap');
+                :root {{
+                    --base-black: #121212; --base-gray: #807F8C; --base-white: #FFFFFF;
+                    --primary-blue: #0F2CAB; --primary-orange: #FF6849;
+                    --secondary-pink: #CF4BC0; --secondary-purple: #896DF3; --secondary-turquoise: #31B7AE;
+                    --background-dark-1: #01010A; --background-dark-2: #04021F; --background-dark-3: #050329; --background-dark-4: #0B0848;
+                    --gradient: linear-gradient(90deg, var(--primary-orange), var(--primary-blue));
+                }}
+                body {{ font-family: 'Roboto', sans-serif; background-color: var(--background-dark-3); color: var(--base-white); margin: 0; padding: 2rem; }}
+                .container {{ width: 100%; max-width: 1200px; margin: auto; background-color: var(--background-dark-2); border-radius: 15px; padding: 2rem 3rem; border: 1px solid var(--background-dark-4); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }}
+                header h1 {{ font-family: 'Exo 2', sans-serif; font-size: 3rem; text-align: center; margin-bottom: 2rem; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
+                .navbar {{ display: flex; flex-wrap: wrap; justify-content: center; margin-bottom: 2.5rem; background-color: var(--background-dark-4); border-radius: 10px; padding: 0.5rem; }}
+                .nav-btn {{ background: none; border: none; color: var(--base-gray); padding: 0.8rem 1.5rem; margin: 0.25rem; font-size: 1rem; font-weight: 700; cursor: pointer; border-radius: 7px; transition: all 0.3s ease; }}
+                .nav-btn:hover {{ background-color: rgba(255, 255, 255, 0.1); color: var(--base-white); }}
+                .nav-btn.active {{ background-color: var(--primary-blue); color: var(--base-white); box-shadow: 0 0 15px rgba(15, 44, 171, 0.5); }}
+                .content-section {{ display: none; }} .content-section.active {{ display: block; }}
+                .plot-container {{ background-color: var(--background-dark-3); padding: 1.5rem; border-radius: 10px; border: 1px solid var(--background-dark-4); text-align: center; margin-top: 1rem; }}
+                .plot-container img {{ max-width: 100%; height: auto; border-radius: 5px; background-color: white; }}
+                .plot-container p {{ color: var(--base-gray); font-style: italic; }}
+                h2 {{ color: var(--primary-orange); border-bottom: 2px solid var(--primary-blue); padding-bottom: 0.5rem; }}
+                .overview-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }}
+                .stat-card {{ background-color: var(--background-dark-4); padding: 1.5rem; border-radius: 10px; text-align: center; border-left: 5px solid var(--primary-orange); }}
+                .stat-card h3 {{ margin-top: 0; color: var(--base-white); font-size: 1.1rem; }}
+                .stat-card p {{ font-size: 2rem; font-weight: 700; color: var(--primary-blue); margin-bottom: 0; }}
+                .df-preview {{ margin-top: 2rem; }}
+                .styled-table {{ width: 100%; color: var(--base-white); background-color: var(--background-dark-4); border-collapse: collapse; }}
+                .styled-table th, .styled-table td {{ border: 1px solid var(--background-dark-3); padding: 0.8rem; text-align: left; }}
+                .styled-table thead {{ background-color: var(--primary-blue); }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <header><h1>Noventis</h1></header>
+
+                <nav class="navbar">
+                    <button class="nav-btn active" onclick="showTab(event, 'overview')">Overview</button>
+                    <button class="nav-btn" onclick="showTab(event, 'imputer')">Imputer</button>
+                    <button class="nav-btn" onclick="showTab(event, 'outlier')">Outlier</button>
+                    <button class="nav-btn" onclick="showTab(event, 'scaler')">Scaler</button>
+                    <button class="nav-btn" onclick="showTab(event, 'encoder')">Encoder</button>
+                </nav>
+
+                <main>
+                    <section id="overview" class="content-section active">
+                        <h2>Ringkasan Kualitas Data Awal</h2>
+                        {overview_html}
+                    </section>
+                    <section id="imputer" class="content-section"><div class="plot-container">{self._get_plot_html(imputer_plot_b64, 'Perbandingan Imputasi')}</div></section>
+                    <section id="outlier" class="content-section"><div class="plot-container">{self._get_plot_html(outlier_plot_b64, 'Perbandingan Penanganan Outlier')}</div></section>
+                    <section id="scaler" class="content-section"><div class="plot-container">{self._get_plot_html(scaler_plot_b64, 'Perbandingan Scaler')}</div></section>
+                    <section id="encoder" class="content-section"><div class="plot-container">{self._get_plot_html(encoder_plot_b64, 'Perbandingan Encoder')}</div></section>
+                </main>
+            </div>
+
+            <script>
+                function showTab(event, tabName) {{
+                    // Sembunyikan semua konten
+                    const contentSections = document.querySelectorAll('.content-section');
+                    contentSections.forEach(section => {{
+                        section.style.display = 'none';
+                        section.classList.remove('active');
+                    }});
+
+                    // Non-aktifkan semua tombol
+                    const navButtons = document.querySelectorAll('.nav-btn');
+                    navButtons.forEach(button => {{
+                        button.classList.remove('active');
+                    }});
+
+                    // Tampilkan konten yang ditargetkan
+                    document.getElementById(tabName).style.display = 'block';
+                    document.getElementById(tabName).classList.add('active');
+
+                    // Aktifkan tombol yang diklik
+                    event.currentTarget.classList.add('active');
+                }}
+
+                // Secara default, tampilkan tab pertama saat halaman dimuat
+                document.addEventListener('DOMContentLoaded', (event) => {{
+                    document.querySelector('.nav-btn').click();
+                }});
+            </script>
+        </body>
+        </html>
+        """
+        return HTML(html_template)
+
+    # Jangan lupa untuk juga menyertakan metode helper ini di dalam kelas
+    def _get_plot_html(self, base64_str, title):
+        """Helper untuk membuat tag img atau pesan jika plot tidak ada."""
+        if base64_str:
+            # Menambahkan background putih pada gambar agar plot terlihat jelas
+            return f'<h2>{title}</h2><img src="{base64_str}" style="background-color: #FFFFFF;">'
+        else:
+            return f"<h2>{title}</h2><p>Visualisasi tidak tersedia atau tidak dapat dibuat untuk langkah ini.</p>"
 
 def data_cleaner(
     data: Union[str, pd.DataFrame],
@@ -349,3 +515,5 @@ def data_cleaner(
         return cleaned_df, cleaner_instance
     else:
         return cleaned_df
+    
+

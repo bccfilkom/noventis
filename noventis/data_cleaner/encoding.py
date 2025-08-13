@@ -438,31 +438,89 @@ class NoventisEncoder:
         
         return report
 
-    def plot_comparison(self, X: pd.DataFrame, max_cols: int = 3):
-
+    def plot_comparison(self, X: pd.DataFrame, max_cols: int = 1):
+        """
+        Membuat visualisasi perbandingan sebelum dan sesudah encoding,
+        yang beradaptasi dengan metode encoding yang digunakan.
+        """
         if not self.is_fitted:
-            raise RuntimeError("Encoder harus di-fit terlebih dahulu sebelum transform.")
-
-        print("Membuat visualisasi perbandingan untuk encoding...")
-        
-        transformed_data = self.transform(X.copy())
-
-        cols_to_plot = [col for col, method in self.learned_cols.items() if method in ['label', 'ohe', 'ordinal']][:max_cols]
-
-        if not cols_to_plot:
-            print("Tidak ada kolom dengan metode encoding yang cocok untuk divisualisasikan (misal: label, ohe).")
+            print("Encoder harus di-fit terlebih dahulu sebelum membuat plot.")
             return
 
-        for col in cols_to_plot:
-            plt.figure(figsize=(10, 5))
+        # Ambil kolom pertama yang di-encode untuk divisualisasikan
+        if not self.learned_cols:
+            print("Tidak ada kolom yang di-encode untuk divisualisasikan.")
+            return
             
-            X[col].value_counts().nlargest(15).plot(kind='bar', color='skyblue', alpha=0.7)
+        col_to_plot = list(self.learned_cols.keys())[0]
+        method_used = self.learned_cols[col_to_plot]
+
+        # Transform data untuk mendapatkan hasil 'sesudah'
+        df_before = X.copy()
+        df_after = self.transform(df_before.copy()) # Panggil transform di sini
+
+        fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+        fig.suptitle(f"Perbandingan Encoder untuk Kolom '{col_to_plot}' (Metode: {method_used.upper()})", fontsize=16)
+
+        # --- PLOT KIRI: SEBELUM ENCODING ---
+        # Membuat count plot horizontal untuk keterbacaan yang lebih baik
+        top_n = 20 # Batasi jumlah kategori yang ditampilkan
+        order = df_before[col_to_plot].value_counts().nlargest(top_n).index
+        sns.countplot(y=df_before[col_to_plot], order=order, ax=axes[0], palette="viridis")
+        axes[0].set_title("Sebelum: Frekuensi Kategori")
+        axes[0].set_xlabel("Jumlah")
+        axes[0].set_ylabel("Kategori")
+        
+        # Tambahkan info korelasi jika tersedia
+        if self.column_info and col_to_plot in self.column_info:
+            corr = self.column_info[col_to_plot].get('correlation_with_target', 0)
+            axes[0].text(0.95, 0.05, f"Korelasi (Cramér's V): {corr:.2f}", 
+                        transform=axes[0].transAxes, ha='right', va='bottom',
+                        bbox=dict(boxstyle='round,pad=0.5', fc='wheat', alpha=0.5))
+
+
+        # --- PLOT KANAN: SESUDAH ENCODING ---
+        axes[1].set_title("Sesudah: Hasil Encoding")
+        
+        # Jika metode menghasilkan BANYAK kolom (OHE, Binary, Hashing) -> gunakan Heatmap
+        if method_used in ['ohe', 'binary', 'hashing']:
+            # Cari kolom baru yang relevan
+            new_cols = [c for c in df_after.columns if c.startswith(f'{col_to_plot}_')]
+            if not new_cols and method_used == 'ohe': # Fallback untuk OHE scikit-learn
+                new_cols = self.encoders[col_to_plot].get_feature_names_out([col_to_plot])
+
+            if new_cols:
+                # Ambil sampel 30 baris pertama untuk heatmap agar tidak terlalu ramai
+                sns.heatmap(df_after[new_cols].head(30), cmap="magma", ax=axes[1], cbar=False)
+                axes[1].set_xlabel("Fitur Baru yang Dihasilkan")
+                axes[1].set_ylabel("Sampel Baris Data")
+                axes[1].tick_params(axis='x', rotation=45)
+            else:
+                axes[1].text(0.5, 0.5, "Tidak dapat menemukan kolom baru untuk heatmap.", ha='center', va='center')
+
+        # Jika metode menghasilkan SATU kolom (Label, Target, Ordinal) -> gunakan Histogram
+        elif method_used in ['label', 'target', 'ordinal']:
+            # Cari nama kolom baru
+            new_col_name = None
+            suffixes = ['_encoded', '_target_encoded', '_ordinal_encoded']
+            for suffix in suffixes:
+                if f'{col_to_plot}{suffix}' in df_after.columns:
+                    new_col_name = f'{col_to_plot}{suffix}'
+                    break
             
-            plt.title(f"Distribusi 15 Kategori Teratas untuk '{col}' (Sebelum Encoding)")
-            plt.ylabel("Frekuensi")
-            plt.xticks(rotation=45, ha='right')
-            plt.tight_layout()
-            plt.show()
+            if new_col_name:
+                sns.histplot(df_after[new_col_name], kde=True, ax=axes[1], color='lightgreen')
+                axes[1].set_xlabel("Nilai Numerik Hasil Encoding")
+                axes[1].set_ylabel("Frekuensi")
+            else:
+                axes[1].text(0.5, 0.5, "Tidak dapat menemukan kolom baru untuk histogram.", ha='center', va='center')
+        
+        else:
+            axes[1].text(0.5, 0.5, f"Visualisasi untuk metode '{method_used}' tidak tersedia.", ha='center', va='center')
+
+
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        return fig
 
 
     
