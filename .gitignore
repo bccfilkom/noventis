@@ -1,2 +1,23 @@
 /noventis/__pycache__/
 /noventis.data_cleaner/__pycache__
+
+# Folder cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Folder lingkungan virtual
+.venv/
+venv/
+env/
+
+# Folder hasil build dan distribusi
+dist/
+build/
+*.egg-info/
+
+# File-file spesifik editor/OS
+.vscode/
+.idea/
+*.DS_Store
