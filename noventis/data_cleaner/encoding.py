@@ -9,7 +9,7 @@ import logging
 from category_encoders import OrdinalEncoder, BinaryEncoder, HashingEncoder
 import matplotlib.pyplot as plt
 import seaborn as sns
-from data_quality import assess_data_quality 
+# from data_quality import assess_data_quality 
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -330,8 +330,10 @@ class NoventisEncoder:
                     df[f'{col}_encoded'] = self.encoders[col].transform(df[col].astype(str).fillna('missing'))
                     transformed_cols.append(f'{col}_encoded')
                 elif method == 'ohe':
-                    encoded_array = encoder.transform(df[[col]].fillna('missing'))
-                    new_cols = encoder.get_feature_names_out([col])
+                    encoder_instance = self.encoders[col] 
+
+                    encoded_array = encoder_instance.transform(df[[col]].fillna('missing'))
+                    new_cols = encoder_instance.get_feature_names_out([col])
                     ohe_df = pd.DataFrame(encoded_array, columns=new_cols, index=df.index)
                     df = pd.concat([df, ohe_df], axis=1)
                 elif method == 'target':

@@ -6,6 +6,9 @@ from sklearn.preprocessing import (
     StandardScaler, MinMaxScaler, RobustScaler, PowerTransformer
 )
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 # Default parameter setiap metode scaling
 LIST_SCALER = {
     "standard": {"with_mean": True, "with_std": True},
@@ -288,10 +291,7 @@ class NoventisScaler:
             plt.show()
 
     def print_quality_report(self):
-        """
-        Analyzes data before and after scaling, then prints
-        a side-by-side data quality comparison report.
-        """
+
         if not self.is_fitted_:
             print("⚠️ Scaler must be fitted first. Run .fit() or .fit_transform().")
             return
@@ -302,15 +302,12 @@ class NoventisScaler:
 
         print("📊" + "="*23 + " SCALING QUALITY REPORT " + "="*23 + "📊")
         
-        # Get the before and after dataframes
         df_before = self._original_df_snapshot
         df_after = self.transform(df_before.copy())
-        
-        # Analyze both versions
+
         report_before = assess_data_quality(df_before)
         report_after = assess_data_quality(df_after)
         
-        # Print the comparison
         order = [
             'completeness', 'datatype_purity', 'outlier_quality', 
             'distribution_quality'
@@ -324,8 +321,7 @@ class NoventisScaler:
                 title = key.replace('_', ' ').title()
                 score_before = report_before[key]['score']
                 score_after = report_after[key]['score']
-                
-                # Add an indicator for improvement
+
                 indicator = "✅" if score_after > score_before else "  "
                 
                 print(f"{title:<25} | {score_before:<12} | {score_after:<12} {indicator}")

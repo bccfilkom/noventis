@@ -93,30 +93,3 @@ def assess_data_quality(df: pd.DataFrame) -> dict:
     }
 
     return results
-
-
-def print_quality_report(df: pd.DataFrame):
-    """
-    Analyzes a DataFrame and prints a formatted quality report.
-    
-    Args:
-        df (pd.DataFrame): The DataFrame to analyze and report on.
-    """
-    print("📊" + "="*25 + " DATA QUALITY REPORT " + "="*25 + "📊")
-    
-    report = assess_data_quality(df)
-    
-    # Define the desired order
-    order = [
-        'completeness', 'datatype_purity', 'outlier_quality', 
-        'distribution_quality', 'encoding_need', 'cardinality_complexity'
-    ]
-    
-    for key in order:
-        if key in report:
-            title = key.replace('_', ' ').title()
-            score = report[key]['score']
-            description = report[key]['description']
-            print(f"🔹 {title:<25}: {score:<12} | {description}")
-            
-    print("="*72)
