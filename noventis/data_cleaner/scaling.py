@@ -255,32 +255,67 @@ class NoventisScaler:
 
 
     def plot_comparison(self, max_cols: int = 1):
-        if not self.is_fitted_ or self._original_df_snapshot is None: return
+        if not self.is_fitted_ or self._original_df_snapshot is None: return None
         cols_to_plot = list(self.scalers_.keys())[:max_cols]
-        if not cols_to_plot: return
+        if not cols_to_plot: return None
 
         original_data = self._original_df_snapshot
         transformed_data = self.transform(original_data.copy())
         col = cols_to_plot[0]
-        
-        # Membuat 2x2 grid untuk plot
-        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-        fig.suptitle(f"Perbandingan Scaler untuk Kolom '{col}' (Metode: {self.fitted_methods_[col].upper()})", fontsize=16)
 
-        # Sebelum Scaling
-        sns.histplot(original_data[col], kde=True, ax=axes[0, 0], color='skyblue')
-        axes[0, 0].set_title("Sebelum: Distribusi Histogram")
+        color_before, color_after = '#58A6FF', '#F78166'
+        bg_color, text_color = '#0D1117', '#C9D1D9'
+
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12), facecolor=bg_color)
+        fig.suptitle(f"Scaling Comparison for '{col}' (Method: {self.fitted_methods_[col].upper()})",
+                     fontsize=20, color=text_color, weight='bold')
+
+        # --- BEFORE ---
+        sns.histplot(original_data[col], kde=True, ax=axes[0, 0], color=color_before)
+        axes[0, 0].set_title("Before: Distribution", color=text_color, fontsize=14)
         stats.probplot(original_data[col].dropna(), dist="norm", plot=axes[0, 1])
-        axes[0, 1].set_title("Sebelum: Q-Q Plot vs Normal")
+        axes[0, 1].get_lines()[0].set(color=color_before, markerfacecolor=color_before)
+        axes[0, 1].get_lines()[1].set(color='white', linestyle='--')
+        axes[0, 1].set_title("Before: Q-Q Plot vs Normal", color=text_color, fontsize=14)
 
-        # Sesudah Scaling
-        sns.histplot(transformed_data[col], kde=True, ax=axes[1, 0], color='lightgreen')
-        axes[1, 0].set_title("Sesudah: Distribusi Histogram")
+        # --- AFTER ---
+        sns.histplot(transformed_data[col], kde=True, ax=axes[1, 0], color=color_after)
+        axes[1, 0].set_title("After: Distribution", color=text_color, fontsize=14)
         stats.probplot(transformed_data[col].dropna(), dist="norm", plot=axes[1, 1])
-        axes[1, 1].set_title("Sesudah: Q-Q Plot vs Normal")
+        axes[1, 1].get_lines()[0].set(color=color_after, markerfacecolor=color_after)
+        axes[1, 1].get_lines()[1].set(color='white', linestyle='--')
+        axes[1, 1].set_title("After: Q-Q Plot vs Normal", color=text_color, fontsize=14)
 
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        for ax_row in axes:
+            for ax in ax_row:
+                ax.set_facecolor(bg_color)
+                ax.tick_params(colors=text_color, which='both')
+                for spine in ax.spines.values(): spine.set_edgecolor(text_color)
+                ax.title.set_color(text_color)
+                ax.xaxis.label.set_color(text_color)
+                ax.yaxis.label.set_color(text_color)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
         return fig
+
+    def get_summary_text(self) -> str:
+        """Generates a formatted string summary for the HTML report."""
+        if not self.is_fitted_: return "<p>Scaler has not been fitted.</p>"
+
+        reasons_html = "".join([f"<li><b>{col}:</b> Used '{self.fitted_methods_.get(col, 'N/A').upper()}' because: {reason}</li>" for col, reason in self.reasons_.items()])
+
+        summary_html = f"""
+            <div class="grid-item">
+                <h4>Scaling Summary</h4>
+                <p><b>Strategy:</b> {self.method.upper()}</p>
+                <p><b>Numeric Columns Scaled:</b> {len(self.scalers_)}</p>
+            </div>
+            <div class="grid-item">
+                <h4>Automatic Decision Reasons</h4>
+                <ul>{reasons_html if reasons_html else "<li>No automatic decisions made or reported.</li>"}</ul>
+            </div>
+        """
+        return summary_html
 
     def print_quality_report(self):
 

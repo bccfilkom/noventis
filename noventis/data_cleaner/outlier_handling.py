@@ -22,7 +22,8 @@ class NoventisOutlierHandler:
                  iqr_multiplier: float = 1.5,
                  quantile_range: Tuple[float, float] = (0.05, 0.95),
                  min_data_threshold: int = 100,
-                 skew_threshold: float = 1.0):
+                 skew_threshold: float = 1.0,
+                 verbose: bool = True):
         """
         Inisialisasi NoventisOutlierHandler.
 
@@ -40,7 +41,8 @@ class NoventisOutlierHandler:
         self.quantile_range = quantile_range
         self.min_data_threshold = min_data_threshold
         self.skew_threshold = skew_threshold
-
+        self.verbose = verbose
+        
         self.is_fitted_ = False
         self.boundaries_: Dict[str, Tuple[float, float]] = {}
         self.methods_: Dict[str, str] = {}
@@ -101,6 +103,10 @@ class NoventisOutlierHandler:
                 self.indices_to_drop_.update(outlier_indices)
         
         self.is_fitted_ = True
+
+        if self.verbose:
+            self._print_summary(X)
+            
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -144,47 +150,88 @@ class NoventisOutlierHandler:
         Melakukan fit dan transform dalam satu langkah.
         """
         return self.fit(X).transform(X)
-    
-    # Tambahkan metode baru ini di dalam kelas NoventisOutlierHandler
-
     def get_quality_report(self) -> Dict[str, Any]:
-        """
-        Mengembalikan ringkasan statistik dan skor dari proses penanganan outlier.
-
-        Returns:
-            dict: Kamus berisi metrik sebelum dan sesudah proses.
-        """
+        """Mengembalikan laporan kualitas detail dari proses penanganan outlier."""
         if not self.is_fitted_:
-            print("Handler belum di-fit. Jalankan .fit() atau .fit_transform() terlebih dahulu.")
+            print("Handler belum di-fit.")
             return {}
         return self.quality_report_
 
+    def _print_summary(self, X: pd.DataFrame):
+        """Mencetak ringkasan yang mudah dibaca ke konsol."""
+        # Perlu .transform() dummy untuk mendapatkan hasil akhir
+        df_after = self.transform(X.copy())
+        report = self.get_quality_report()
+        summary = report.get('overall_summary', {})
+        
+        print("\n📋" + "="*23 + " OUTLIER HANDLING SUMMARY " + "="*23 + "📋")
+        print(f"{'Method':<25} | {self.default_method.upper() if self.default_method == 'auto' else 'CUSTOM MAP'}")
+        print(f"{'Total Rows Removed':<25} | {summary.get('outliers_removed (rows)', 'N/A')}")
+        print(f"{'Data Retained Score':<25} | {summary.get('data_retained_score', 'N/A')}")
+        print("="*72)
+    def get_summary_text(self) -> str:
+        """Generates a formatted string summary for the HTML report."""
+        if not self.is_fitted_: return "<p>Outlier Handler has not been fitted.</p>"
+
+        report = self.quality_report_
+        methods_html = "".join([f"<li><b>{col}:</b> '{method.upper()}'</li>" for col, method in self.methods_.items()])
+
+        summary_html = f"""
+            <div class="grid-item">
+                <h4>Outlier Summary</h4>
+                <p><b>Rows Before:</b> {report.get('rows_before', 0)}</p>
+                <p><b>Rows After:</b> {report.get('rows_after', 0)}</p>
+                <p><b>Outlier Rows Removed:</b> {report.get('outliers_removed', 0)}</p>
+            </div>
+            <div class="grid-item">
+                <h4>Methodology per Column</h4>
+                <ul>{methods_html if methods_html else "<li>No columns handled.</li>"}</ul>
+            </div>
+        """
+        return summary_html
+
     def plot_comparison(self, max_cols: int = 1):
-        if not self.is_fitted_ or self._original_df_snapshot is None: return
-        cols_to_plot = list(self.methods_.keys())[:max_cols]
-        if not cols_to_plot: return
+        if not self.is_fitted_ or self._original_df_snapshot is None: return None
+        cols_to_plot = [col for col, method in self.methods_.items() if method != 'none']
+        if not cols_to_plot: return None
+        col_to_plot = cols_to_plot[0]
 
         original_data = self._original_df_snapshot
         transformed_data = self.transform(original_data.copy())
-        col = cols_to_plot[0]
 
-        fig, axes = plt.subplots(2, 2, figsize=(12, 8), gridspec_kw={'height_ratios': [3, 1]})
-        fig.suptitle(f"Perbandingan Penanganan Outlier untuk '{col}'", fontsize=16)
-        
-        # Hapus spasi antar subplot vertikal
-        fig.subplots_adjust(hspace=0)
+        color_before, color_after = '#58A6FF', '#F78166'
+        bg_color, text_color = '#0D1117', '#C9D1D9'
 
-        # Sebelum
-        sns.histplot(original_data[col], kde=True, ax=axes[0, 0], color='skyblue')
-        axes[0, 0].set_title("Sebelum")
-        axes[0, 0].tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False) # Sembunyikan label x
-        sns.boxplot(x=original_data[col], ax=axes[1, 0], color='skyblue')
+        fig = plt.figure(figsize=(16, 8), facecolor=bg_color)
+        gs = fig.add_gridspec(2, 2, height_ratios=(3, 1), hspace=0.05)
+        fig.suptitle(f"Outlier Handling Comparison for '{col_to_plot}' (Method: {self.methods_[col_to_plot].upper()})",
+                     fontsize=20, color=text_color, weight='bold')
 
-        # Sesudah
-        sns.histplot(transformed_data[col], kde=True, ax=axes[0, 1], color='lightgreen')
-        axes[0, 1].set_title("Sesudah")
-        axes[0, 1].tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False) # Sembunyikan label x
-        sns.boxplot(x=transformed_data[col], ax=axes[1, 1], color='lightgreen')
+        # --- BEFORE ---
+        ax_hist_before = fig.add_subplot(gs[0, 0])
+        ax_box_before = fig.add_subplot(gs[1, 0], sharex=ax_hist_before)
+        sns.histplot(data=original_data, x=col_to_plot, kde=True, ax=ax_hist_before, color=color_before)
+        sns.boxplot(data=original_data, x=col_to_plot, ax=ax_box_before, color=color_before)
+        ax_hist_before.set_title("Before", color=text_color, fontsize=14)
+        plt.setp(ax_hist_before.get_xticklabels(), visible=False) # Hide x-axis labels on hist plot
 
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        # --- AFTER ---
+        ax_hist_after = fig.add_subplot(gs[0, 1])
+        ax_box_after = fig.add_subplot(gs[1, 1], sharex=ax_hist_after)
+        sns.histplot(data=transformed_data, x=col_to_plot, kde=True, ax=ax_hist_after, color=color_after)
+        sns.boxplot(data=transformed_data, x=col_to_plot, ax=ax_box_after, color=color_after)
+        ax_hist_after.set_title("After", color=text_color, fontsize=14)
+        plt.setp(ax_hist_after.get_xticklabels(), visible=False)
+
+        # Style all axes
+        for ax in [ax_hist_before, ax_box_before, ax_hist_after, ax_box_after]:
+            ax.set_facecolor(bg_color)
+            ax.tick_params(colors=text_color, which='both')
+            for spine in ax.spines.values(): spine.set_edgecolor(text_color)
+            ax.xaxis.label.set_color(text_color)
+            ax.yaxis.label.set_color(text_color)
+            ax.set_xlabel('') # Remove individual x-labels
+            ax.set_ylabel('') # Remove individual y-labels
+
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
         return fig

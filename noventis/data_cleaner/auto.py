@@ -13,22 +13,18 @@ from .data_quality import assess_data_quality
 
 import io
 import base64
+import matplotlib.pyplot as plt
 
 def plot_to_base64(fig):
-    """Mengonversi figure Matplotlib menjadi string Base64 untuk disisipkan di HTML."""
+    """Converts a Matplotlib figure to a Base64 string for HTML embedding."""
     if fig is None:
         return ""
-    # Membuat buffer di memori
     buf = io.BytesIO()
-    # Menyimpan plot ke buffer dalam format PNG
-    fig.savefig(buf, format='png', bbox_inches='tight')
-    # Kembali ke awal buffer
+    fig.savefig(buf, format='png', bbox_inches='tight', facecolor=fig.get_facecolor())
     buf.seek(0)
-    # Encode buffer ke Base64 dan ubah menjadi string
     img_str = base64.b64encode(buf.read()).decode('utf-8')
-    # Tutup buffer
     buf.close()
-    # Kembalikan string dengan format yang bisa dibaca tag <img> HTML
+    plt.close(fig) # Close the figure to free up memory
     return f"data:image/png;base64,{img_str}"
 
 class NoventisDataCleaner:
@@ -76,6 +72,7 @@ class NoventisDataCleaner:
         self.reports_ = {}
         self.quality_score_ = {}
         self._original_df = None
+        self._processed_df = None
 
 
     def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
@@ -108,23 +105,22 @@ class NoventisDataCleaner:
                 self.imputer_ = NoventisImputer(**self.imputer_params)
                 df_processed = self.imputer_.fit_transform(df_processed)
                 self.reports_['impute'] = self.imputer_.get_quality_report()
-
                 if y is not None:
-                    y = y.loc[df_processed.index] 
+                    y = y.loc[df_processed.index]
 
             elif step == 'outlier':
                 self.outlier_handler_ = NoventisOutlierHandler(**self.outlier_params)
                 df_processed = self.outlier_handler_.fit_transform(df_processed)
                 self.reports_['outlier'] = self.outlier_handler_.get_quality_report()
                 if y is not None:
-                    y = y.loc[df_processed.index] 
+                    y = y.loc[df_processed.index]
 
             elif step == 'encode':
-                if 'target_column' not in self.encoder_params and y is not None:
-                    self.encoder_params['target_column'] = y.name
+                # Pass a copy of the dataframe state *before* this step to the encoder for its internal snapshot
                 self.encoder_ = NoventisEncoder(**self.encoder_params)
-                df_processed = self.encoder_.fit_transform(df_processed, y)
+                df_processed = self.encoder_.fit_transform(df_processed.copy(), y)
                 self.reports_['encode'] = self.encoder_.get_quality_report()
+
 
             elif step == 'scale':
                 self.scaler_ = NoventisScaler(**self.scaler_params)
@@ -135,6 +131,7 @@ class NoventisDataCleaner:
                 print(f"Step {step.upper()} Complete.")
 
         self.is_fitted_ = True
+        self._processed_df = df_processed
         self._calculate_quality_score()
 
         if self.verbose:
@@ -149,275 +146,272 @@ class NoventisDataCleaner:
         Calculates the overall data quality score based on reports from each step.
         """
         scores = {}
+        initial_quality = assess_data_quality(self._original_df)
+        final_quality = assess_data_quality(self._processed_df)
 
-        # 1. Completeness Score from Imputer
-        if 'impute' in self.reports_ and self.reports_['impute']:
-            comp_score_str = self.reports_['impute'].get('completion_score', '0%')
-            scores['completeness'] = float(comp_score_str.replace('%', ''))
-        else:
-            scores['completeness'] = 100.0 # Assume data is already complete
-
-        # 2. Consistency Score from Outlier Handler
-        if 'outlier' in self.reports_ and self.reports_['outlier']:
-            rows_before = self.reports_['outlier'].get('rows_before', 1)
-            rows_after = self.reports_['outlier'].get('rows_after', 1)
-            scores['consistency'] = (rows_after / rows_before) * 100 if rows_before > 0 else 100.0
-        else:
-            scores['consistency'] = 100.0 # Assume no outliers were removed
-
-        # 3. Distribution Score from Scaler
-        if 'scale' in self.reports_ and self.reports_['scale']:
-            skew_changes = []
-            if 'column_details' in self.reports_['scale']:
-                for col_detail in self.reports_['scale']['column_details'].values():
-                    try:
-                        # Correction: Convert to float before subtraction
-                        skew_before = float(col_detail.get('skewness_before', 0))
-                        skew_after = float(col_detail.get('skewness_after', 0))
-                        if skew_before > 0:
-                            # Measure the percentage reduction in skewness
-                            change = max(0, (abs(skew_before) - abs(skew_after)) / abs(skew_before))
-                            skew_changes.append(change)
-                    except (ValueError, TypeError):
-                        continue
-                avg_skew_reduction = np.mean(skew_changes) if skew_changes else 0
-                scores['distribution'] = avg_skew_reduction * 100
-            else:
-                scores['distribution'] = 0.0
-        else:
-            scores['distribution'] = 0.0 # No scaling, no distribution improvement
-
-        # 4. Dimensionality Efficiency Score from Encoder
+        scores['completeness'] = float(final_quality['completeness']['score'].replace('%',''))
+        scores['consistency'] = float(final_quality['outlier_quality']['score'].replace('%',''))
+        scores['distribution'] = float(final_quality['distribution_quality']['score'].replace('/100',''))
+        
+        # Dimensionality score
         if 'encode' in self.reports_ and self.reports_['encode']:
             dim_change_str = self.reports_['encode']['overall_summary'].get('dimensionality_change', '+0.0%')
             dim_change = float(dim_change_str.replace('%', '').replace('+', ''))
-            # Score is higher if dimensionality does not increase significantly
-            scores['dimensionality'] = max(0, 100 - dim_change)
+            scores['dimensionality'] = max(0, 100 - max(0, dim_change * 2)) # Penalize increase more
         else:
-            scores['dimensionality'] = 100.0 # No encoding, dimensionality does not change
+            scores['dimensionality'] = 100.0
 
-        # Weights for each score
-        weights = {
-            'completeness': 0.40,
-            'consistency': 0.30,
-            'distribution': 0.20,
-            'dimensionality': 0.10
-        }
+        weights = {'completeness': 0.40, 'consistency': 0.30, 'distribution': 0.20, 'dimensionality': 0.10}
 
-        final_score = (scores['completeness'] * weights['completeness'] +
-                       scores['consistency'] * weights['consistency'] +
-                       scores['distribution'] * weights['distribution'] +
-                       scores['dimensionality'] * weights['dimensionality'])
+        final_score = sum(scores[key] * weights[key] for key in scores)
 
         self.quality_score_ = {
             'final_score': f"{final_score:.2f}/100",
             'details': {
                 'Completeness Score': f"{scores['completeness']:.2f}",
                 'Data Consistency Score': f"{scores['consistency']:.2f}",
-                'Distribution Improvement Score': f"{scores['distribution']:.2f}",
+                'Distribution Quality Score': f"{scores['distribution']:.2f}",
                 'Dimensionality Efficiency Score': f"{scores['dimensionality']:.2f}"
             },
             'weights': weights
         }
 
+
     def display_summary_report(self):
         """
-        Displays the comprehensive final summary report.
+        Displays the comprehensive final summary report in the console.
         """
         if not self.is_fitted_:
             print("Cleaner has not been run. Execute .fit_transform() first.")
             return
 
         print("\n" + "="*22 + " DATA QUALITY REPORT " + "="*22)
-
-        # Quality Score
-        print("\n" + "--- OVERALL DATA QUALITY SCORE ---")
         print(f"  Final Quality Score: {self.quality_score_['final_score']}")
         for name, score in self.quality_score_['details'].items():
             weight_key = name.split(' ')[0].lower()
             weight = self.quality_score_['weights'].get(weight_key, 0) * 100
             print(f"     - {name:<35}: {score:<10} (Weight: {weight:.0f}%)")
 
-        # Details per Step
         print("\n" + "--- PIPELINE PROCESS SUMMARY ---")
         if 'impute' in self.reports_ and self.reports_['impute']:
             imputed_count = self.reports_['impute'].get('values_imputed', 0)
             print(f"  - Imputation: Successfully filled {imputed_count} missing values.")
-
         if 'outlier' in self.reports_ and self.reports_['outlier']:
             removed_count = self.reports_['outlier'].get('outliers_removed', 0)
             print(f"  - Outliers: Removed {removed_count} rows identified as outliers.")
-
         if 'encode' in self.reports_ and self.reports_['encode']:
             summary = self.reports_['encode'].get('overall_summary', {})
             encoded_cols = summary.get('total_columns_encoded', 0)
             new_features = summary.get('total_features_created', 0)
             print(f"  - Encoding: Transformed {encoded_cols} categorical columns into {new_features} new features.")
-
         if 'scale' in self.reports_ and self.reports_['scale']:
             scaled_cols = len(self.reports_['scale'].get('column_details', {}))
             print(f"  - Scaling: Standardized the scale for {scaled_cols} numerical columns.")
 
-        # Details of Automatic Decisions
-        print("\n" + "--- AUTOMATIC DECISION DETAILS ---")
-        if self.scaler_ and self.scaler_.method == 'auto' and hasattr(self.scaler_, 'reasons_'):
-            print("  - SCALING:")
-            for col, reason in self.scaler_.reasons_.items():
-                method = self.scaler_.fitted_methods_.get(col, 'N/A')
-                print(f"    - Column '{col}': Used '{method.upper()}' because: {reason}.")
-
-        if self.encoder_ and self.encoder_.method == 'auto' and hasattr(self.encoder_, 'learned_cols'):
-            print("  - ENCODING:")
-            for col, method in self.encoder_.learned_cols.items():
-                 print(f"    - Column '{col}': Selected method '{method.upper()}'.")
-
         print("\n" + "="*65)
 
-    def plot_all_comparisons(self, max_cols: int = 3):
+    def _get_plot_html(self, base64_str: str, title: str, description: str) -> str:
+        """Helper to generate HTML for a plot or a fallback message."""
+        if base64_str:
+            return f'<h3>{title}</h3><p>{description}</p><div class="plot-container"><img src="{base64_str}"></div>'
+        return f"<h3>{title}</h3><p>Visualization was not generated for this step.</p>"
+
+    def generate_html_report(self) -> HTML:
         """
-        Generates all comparison plots from each pipeline step.
-        """
-        if not self.is_fitted_:
-            print("Cleaner has not been run. Execute .fit_transform() first.")
-            return
-
-        print("\n" + "="*22 + " COMPARISON VISUALIZATIONS " + "="*22)
-
-        if self.imputer_ and hasattr(self.imputer_, 'plot_comparison'):
-            self.imputer_.plot_comparison(max_cols=max_cols)
-        if self.outlier_handler_ and hasattr(self.outlier_handler_, 'plot_comparison'):
-            self.outlier_handler_.plot_comparison(max_cols=max_cols)
-        if self.encoder_ and hasattr(self.encoder_, 'plot_comparison'):
-            # Encoder plot needs the original data before transformation
-            self.encoder_.plot_comparison(self._original_df, max_cols=max_cols)
-            if self.scaler_ and hasattr(self.scaler_, 'plot_comparison'):
-                self.scaler_.plot_comparison(max_cols=max_cols)
-
-
-    
-    def generate_html_report(self):
-        """
-        Menghasilkan dan menampilkan laporan visual HTML interaktif yang lengkap,
-        dengan JavaScript yang andal untuk lingkungan Jupyter Notebook.
+        Generates and displays a complete, visually appealing, and interactive HTML report.
         """
         if not self.is_fitted_ or self._original_df is None:
-            print("Cleaner has not been run. Execute .fit_transform() first.")
-            return
+            return HTML("<h3>Report cannot be generated.</h3><p>Please run the `.fit_transform()` method first.</p>")
+    
+        # --- Overview Tab Content (Tidak berubah) ---
+        imputed_values_report = self.reports_.get('impute', {}).get('overall_summary', {})
+        outlier_report = self.reports_.get('outlier', {})
+        encoder_report = self.reports_.get('encode', {}).get('overall_summary', {})
+        scaler_report = self.reports_.get('scale', {})
 
-        # --- Bagian pengumpulan data dan plot tetap sama ---
-        overview_stats = assess_data_quality(self._original_df)
+        # --- Overview Tab Content ---
         overview_html = f"""
-            <div class="overview-grid">
-                <div class="stat-card"><h3>Total Baris</h3><p>{len(self._original_df)}</p></div>
-                <div class="stat-card"><h3>Total Kolom</h3><p>{len(self._original_df.columns)}</p></div>
-                <div class="stat-card"><h3>Kelengkapan Data</h3><p>{overview_stats['completeness']['score']}</p></div>
-                <div class="stat-card"><h3>Kualitas Outlier</h3><p>{overview_stats['outlier_quality']['score']}</p></div>
-                <div class="stat-card"><h3>Kualitas Distribusi</h3><p>{overview_stats['distribution_quality']['score']}</p></div>
-                <div class="stat-card"><h3>Kemurnian Tipe Data</h3><p>{overview_stats['datatype_purity']['score']}</p></div>
+            <div class="grid-container">
+                <div class="grid-item score-card">
+                    <h4>Final Quality Score</h4>
+                    <p class="score">{self.quality_score_['final_score']}</p>
+                    <div class="score-details">
+                        <span>Completeness: {self.quality_score_['details']['Completeness Score']}</span>
+                        <span>Consistency: {self.quality_score_['details']['Data Consistency Score']}</span>
+                        <span>Distribution: {self.quality_score_['details']['Distribution Quality Score']}</span>
+                        <span>Dimensionality: {self.quality_score_['details']['Dimensionality Efficiency Score']}</span>
+                    </div>
+                </div>
+                <div class="grid-item">
+                    <h4>Initial Data Profile</h4>
+                    <p><b>Rows:</b> {self._original_df.shape[0]}</p>
+                    <p><b>Columns:</b> {self._original_df.shape[1]}</p>
+                    <p><b>Missing Cells:</b> {self._original_df.isnull().sum().sum()}</p>
+                    <p><b>Categorical Columns:</b> {len(self._original_df.select_dtypes(include=['object', 'category']).columns)}</p>
+                </div>
+                <div class="grid-item">
+                    <h4>Processing Summary</h4>
+                    <p><b>Imputed Values:</b> {self.reports_.get('impute', {}).get('values_imputed', 'N/A')}</p>
+                    <p><b>Outlier Rows Removed:</b> {self.reports_.get('outlier', {}).get('outliers_removed', 'N/A')}</p>
+                    <p><b>Categorical Features Encoded:</b> {self.reports_.get('encode', {}).get('overall_summary', {}).get('total_columns_encoded', 'N/A')}</p>
+                    <p><b>Numeric Features Scaled:</b> {len(self.reports_.get('scale', {}).get('column_details', {})) if self.scaler_ else 'N/A'}</p>
+                </div>
             </div>
             <div class="df-preview">
-                <h4>Pratinjau 5 Baris Data Asli:</h4>
+                <h4>Data Preview (First 5 Rows of Original Data)</h4>
                 {self._original_df.head().to_html(classes='styled-table')}
             </div>
         """
-        imputer_fig = self.imputer_.plot_comparison(max_cols=1) if self.imputer_ else None
-        outlier_fig = self.outlier_handler_.plot_comparison(max_cols=1) if self.outlier_handler_ else None
-        scaler_fig = self.scaler_.plot_comparison(max_cols=1) if self.scaler_ else None
-        encoder_fig = self.encoder_.plot_comparison(self._original_df, max_cols=1) if self.encoder_ else None
-        imputer_plot_b64 = plot_to_base64(imputer_fig)
-        outlier_plot_b64 = plot_to_base64(outlier_fig)
-        scaler_plot_b64 = plot_to_base64(scaler_fig)
-        encoder_plot_b64 = plot_to_base64(encoder_fig)
 
-        # --- Template HTML Final dengan Perbaikan JavaScript ---
+        imputer_html = "<h4>This step was not run.</h4>"
+        if self.imputer_:
+            # --- PERUBAHAN ---
+            # Mengambil plot dan ringkasan dari kelasnya masing-masing
+            plot_b64 = plot_to_base64(self.imputer_.plot_comparison(max_cols=1))
+            desc = "Membandingkan distribusi data sebelum dan sesudah penanganan nilai kosong."
+            plot_html = self._get_plot_html(plot_b64, "Distribution & Missingness Comparison", desc)
+            summary_html = self.imputer_.get_summary_text()
+            
+            # Menggabungkan ringkasan dan plot
+            imputer_html = f'<div class="grid-container">{summary_html}</div>{plot_html}'
+
+        # --- Outlier Tab Content ---
+        outlier_html = "<h4>This step was not run.</h4>"
+        if self.outlier_handler_:
+            # --- PERUBAHAN ---
+            # Pola yang sama diterapkan di sini
+            plot_b64 = plot_to_base64(self.outlier_handler_.plot_comparison(max_cols=1))
+            desc = "Visualisasi ini menunjukkan distribusi data dan boxplot sebelum dan sesudah penghapusan outlier."
+            plot_html = self._get_plot_html(plot_b64, "Outlier Handling Comparison", desc)
+            summary_html = self.outlier_handler_.get_summary_text()
+            
+            outlier_html = f'<div class="grid-container">{summary_html}</div>{plot_html}'
+
+        # --- Scaler Tab Content ---
+        scaler_html = "<h4>This step was not run.</h4>"
+        if self.scaler_:
+            # --- PERUBAHAN ---
+            # Dan juga di sini untuk konsistensi
+            plot_b64 = plot_to_base64(self.scaler_.plot_comparison(max_cols=1))
+            desc = "Membandingkan distribusi dan Q-Q plot sebelum dan sesudah scaling."
+            plot_html = self._get_plot_html(plot_b64, "Feature Scaling Comparison", desc)
+            summary_html = self.scaler_.get_summary_text()
+            
+            scaler_html = f'<div class="grid-container">{summary_html}</div>{plot_html}'
+
+        # --- Encoder Tab Content ---
+        encoder_html = "<h4>This step was not run.</h4>"
+        if self.encoder_:
+            # Bagian ini sudah menggunakan pola yang benar
+            report = self.reports_.get('encode', {}).get('overall_summary', {})
+            plot_b64 = plot_to_base64(self.encoder_.plot_comparison(max_cols=1))
+            desc = "Plot 'before' menunjukkan frekuensi kategori asli. Plot 'after' menunjukkan hasilnya."
+            plot_html = self._get_plot_html(plot_b64, "Categorical Encoding Comparison", desc)
+            
+            analysis_summary = self.encoder_.get_summary_text()
+
+            encoder_html = f"""
+                 <div class="grid-container">
+                    <div class="grid-item">
+                        <h4>Encoding Summary</h4>
+                        <p><b>Columns Encoded:</b> {report.get('total_columns_encoded', 0)}</p>
+                        <p><b>New Features Created:</b> {report.get('total_features_created', 0)}</p>
+                        <p><b>Dimensionality Change:</b> {report.get('dimensionality_change', '+0.0%')}</p>
+                    </div>
+                    <div class="grid-item">
+                        {analysis_summary}
+                    </div>
+                </div>{plot_html}"""
+                    # --- 2. BUILD THE HTML STRING ---
         html_template = f"""
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Noventis - Data Cleaning Report</title>
+            <title>Noventis Data Cleaning Report</title>
             <style>
-                /* CSS tetap sama seperti sebelumnya */
-                @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Exo+2:wght@700&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Exo+2:wght@600;800&display=swap');
                 :root {{
-                    --base-black: #121212; --base-gray: #807F8C; --base-white: #FFFFFF;
-                    --primary-blue: #0F2CAB; --primary-orange: #FF6849;
-                    --secondary-pink: #CF4BC0; --secondary-purple: #896DF3; --secondary-turquoise: #31B7AE;
-                    --background-dark-1: #01010A; --background-dark-2: #04021F; --background-dark-3: #050329; --background-dark-4: #0B0848;
-                    --gradient: linear-gradient(90deg, var(--primary-orange), var(--primary-blue));
+                    --bg-dark-1: #0D1117; --bg-dark-2: #161B22; --bg-dark-3: #010409;
+                    --border-color: #30363D; --text-light: #C9D1D9; --text-muted: #8B949E;
+                    --primary-blue: #58A6FF; --primary-orange: #F78166;
+                    --font-main: 'Roboto', sans-serif; --font-header: 'Exo 2', sans-serif;
                 }}
-                body {{ font-family: 'Roboto', sans-serif; background-color: var(--background-dark-3); color: var(--base-white); margin: 0; padding: 2rem; }}
-                .container {{ width: 100%; max-width: 1200px; margin: auto; background-color: var(--background-dark-2); border-radius: 15px; padding: 2rem 3rem; border: 1px solid var(--background-dark-4); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }}
-                header h1 {{ font-family: 'Exo 2', sans-serif; font-size: 3rem; text-align: center; margin-bottom: 2rem; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
-                .navbar {{ display: flex; flex-wrap: wrap; justify-content: center; margin-bottom: 2.5rem; background-color: var(--background-dark-4); border-radius: 10px; padding: 0.5rem; }}
-                .nav-btn {{ background: none; border: none; color: var(--base-gray); padding: 0.8rem 1.5rem; margin: 0.25rem; font-size: 1rem; font-weight: 700; cursor: pointer; border-radius: 7px; transition: all 0.3s ease; }}
-                .nav-btn:hover {{ background-color: rgba(255, 255, 255, 0.1); color: var(--base-white); }}
-                .nav-btn.active {{ background-color: var(--primary-blue); color: var(--base-white); box-shadow: 0 0 15px rgba(15, 44, 171, 0.5); }}
-                .content-section {{ display: none; }} .content-section.active {{ display: block; }}
-                .plot-container {{ background-color: var(--background-dark-3); padding: 1.5rem; border-radius: 10px; border: 1px solid var(--background-dark-4); text-align: center; margin-top: 1rem; }}
-                .plot-container img {{ max-width: 100%; height: auto; border-radius: 5px; background-color: white; }}
-                .plot-container p {{ color: var(--base-gray); font-style: italic; }}
-                h2 {{ color: var(--primary-orange); border-bottom: 2px solid var(--primary-blue); padding-bottom: 0.5rem; }}
-                .overview-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }}
-                .stat-card {{ background-color: var(--background-dark-4); padding: 1.5rem; border-radius: 10px; text-align: center; border-left: 5px solid var(--primary-orange); }}
-                .stat-card h3 {{ margin-top: 0; color: var(--base-white); font-size: 1.1rem; }}
-                .stat-card p {{ font-size: 2rem; font-weight: 700; color: var(--primary-blue); margin-bottom: 0; }}
+                body {{ font-family: var(--font-main); background-color: var(--bg-dark-3); color: var(--text-light); margin: 0; padding: 1.5rem; }}
+                .container {{ width: 100%; max-width: 1400px; margin: auto; background-color: var(--bg-dark-1); border-radius: 10px; border: 1px solid var(--border-color); }}
+                header {{ padding: 1.5rem 2.5rem; border-bottom: 1px solid var(--border-color); background-color: var(--bg-dark-2); border-radius: 10px 10px 0 0; }}
+                header h1 {{ font-family: var(--font-header); font-size: 2.5rem; margin: 0; color: var(--primary-blue); }}
+                header p {{ margin: 0.25rem 0 0; color: var(--text-muted); font-size: 1rem; }}
+                .navbar {{ display: flex; background-color: var(--bg-dark-2); padding: 0 2.5rem; border-bottom: 1px solid var(--border-color); }}
+                .nav-btn {{ background: none; border: none; color: var(--text-muted); padding: 1rem 1.5rem; font-size: 1rem; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s ease-in-out; }}
+                .nav-btn:hover {{ color: var(--text-light); }}
+                .nav-btn.active {{ color: var(--primary-orange); border-bottom-color: var(--primary-orange); font-weight: 700; }}
+                main {{ padding: 2.5rem; }}
+                .content-section {{ display: none; }} .content-section.active {{ display: block; animation: fadeIn 0.5s; }}
+                @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
+                h2 {{ font-family: var(--font-header); font-size: 2rem; color: var(--primary-orange); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-top: 0; }}
+                h3 {{ font-family: var(--font-header); color: var(--primary-blue); font-size: 1.5rem; margin-top: 2rem; }}
+                p {{ line-height: 1.6; }}
+                .grid-container {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }}
+                .grid-item {{ background-color: var(--bg-dark-2); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color); }}
+                .grid-item h4 {{ margin-top: 0; color: var(--text-light); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }}
+                .grid-item p, .grid-item li {{ color: var(--text-muted); }}
+                .grid-item ul {{ padding-left: 20px; margin: 0; }}
+                .score-card .score {{ font-size: 4rem; font-weight: 800; color: var(--primary-orange); margin: 1rem 0; text-align: center; }}
+                .score-card .score-details {{ display: flex; justify-content: space-around; font-size: 0.9rem; text-align: center; color: var(--text-muted); flex-wrap: wrap; }}
                 .df-preview {{ margin-top: 2rem; }}
-                .styled-table {{ width: 100%; color: var(--base-white); background-color: var(--background-dark-4); border-collapse: collapse; }}
-                .styled-table th, .styled-table td {{ border: 1px solid var(--background-dark-3); padding: 0.8rem; text-align: left; }}
-                .styled-table thead {{ background-color: var(--primary-blue); }}
+                .styled-table {{ width: 100%; color: var(--text-muted); background-color: var(--bg-dark-2); border-collapse: collapse; border-radius: 8px; overflow: hidden; }}
+                .styled-table th, .styled-table td {{ border-bottom: 1px solid var(--border-color); padding: 0.8rem 1rem; text-align: left; }}
+                .styled-table thead {{ background-color: var(--bg-dark-3); color: var(--text-light); }}
+                .plot-container {{ background-color: var(--bg-dark-2); padding: 1rem; margin-top: 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center; }}
+                .plot-container img {{ max-width: 80%; height: auto; border-radius: 5px; background-color: #FFFFFF; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <header><h1>Noventis</h1></header>
-
+                <header>
+                    <h1>Noventis Data Cleaning Report</h1>
+                    <p>An automated summary of the data preparation process.</p>
+                </header>
                 <nav class="navbar">
-                    <button class="nav-btn active" onclick="showTab(event, 'overview')">Overview</button>
-                    <button class="nav-btn" onclick="showTab(event, 'imputer')">Imputer</button>
-                    <button class="nav-btn" onclick="showTab(event, 'outlier')">Outlier</button>
-                    <button class="nav-btn" onclick="showTab(event, 'scaler')">Scaler</button>
-                    <button class="nav-btn" onclick="showTab(event, 'encoder')">Encoder</button>
+                    <button class="nav-btn active" onclick="showTab(event, 'overview')">📊 Overview</button>
+                    <button class="nav-btn" onclick="showTab(event, 'imputer')">💧 Imputer</button>
+                    <button class="nav-btn" onclick="showTab(event, 'outlier')">📈 Outlier</button>
+                    <button class="nav-btn" onclick="showTab(event, 'scaler')">⚖️ Scaler</button>
+                    <button class="nav-btn" onclick="showTab(event, 'encoder')">🔠 Encoder</button>
                 </nav>
-
                 <main>
                     <section id="overview" class="content-section active">
-                        <h2>Ringkasan Kualitas Data Awal</h2>
+                        <h2>Pipeline Overview & Final Score</h2>
                         {overview_html}
                     </section>
-                    <section id="imputer" class="content-section"><div class="plot-container">{self._get_plot_html(imputer_plot_b64, 'Perbandingan Imputasi')}</div></section>
-                    <section id="outlier" class="content-section"><div class="plot-container">{self._get_plot_html(outlier_plot_b64, 'Perbandingan Penanganan Outlier')}</div></section>
-                    <section id="scaler" class="content-section"><div class="plot-container">{self._get_plot_html(scaler_plot_b64, 'Perbandingan Scaler')}</div></section>
-                    <section id="encoder" class="content-section"><div class="plot-container">{self._get_plot_html(encoder_plot_b64, 'Perbandingan Encoder')}</div></section>
+                    <section id="imputer" class="content-section">
+                        <h2>Missing Value Imputation</h2>
+                        {imputer_html}
+                    </section>
+                    <section id="outlier" class="content-section">
+                        <h2>Outlier Handling</h2>
+                        {outlier_html}
+                    </section>
+                    <section id="scaler" class="content-section">
+                        <h2>Feature Scaling</h2>
+                        {scaler_html}
+                    </section>
+                    <section id="encoder" class="content-section">
+                        <h2>Categorical Encoding</h2>
+                        {encoder_html}
+                    </section>
                 </main>
             </div>
-
             <script>
                 function showTab(event, tabName) {{
-                    // Sembunyikan semua konten
-                    const contentSections = document.querySelectorAll('.content-section');
-                    contentSections.forEach(section => {{
-                        section.style.display = 'none';
-                        section.classList.remove('active');
-                    }});
-
-                    // Non-aktifkan semua tombol
-                    const navButtons = document.querySelectorAll('.nav-btn');
-                    navButtons.forEach(button => {{
-                        button.classList.remove('active');
-                    }});
-
-                    // Tampilkan konten yang ditargetkan
-                    document.getElementById(tabName).style.display = 'block';
+                    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+                    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
                     document.getElementById(tabName).classList.add('active');
-
-                    // Aktifkan tombol yang diklik
                     event.currentTarget.classList.add('active');
                 }}
-
-                // Secara default, tampilkan tab pertama saat halaman dimuat
-                document.addEventListener('DOMContentLoaded', (event) => {{
+                // Set the first tab as active on load
+                document.addEventListener('DOMContentLoaded', () => {{
                     document.querySelector('.nav-btn').click();
                 }});
             </script>
@@ -425,15 +419,7 @@ class NoventisDataCleaner:
         </html>
         """
         return HTML(html_template)
-
-    # Jangan lupa untuk juga menyertakan metode helper ini di dalam kelas
-    def _get_plot_html(self, base64_str, title):
-        """Helper untuk membuat tag img atau pesan jika plot tidak ada."""
-        if base64_str:
-            # Menambahkan background putih pada gambar agar plot terlihat jelas
-            return f'<h2>{title}</h2><img src="{base64_str}" style="background-color: #FFFFFF;">'
-        else:
-            return f"<h2>{title}</h2><p>Visualisasi tidak tersedia atau tidak dapat dibuat untuk langkah ini.</p>"
+    
 
 def data_cleaner(
     data: Union[str, pd.DataFrame],
@@ -510,7 +496,6 @@ def data_cleaner(
 
     cleaned_df = cleaner_instance.fit_transform(X, y)
 
-    # --- BAGIAN RETURN YANG DIMODIFIKASI ---
     if return_instance:
         return cleaned_df, cleaner_instance
     else:

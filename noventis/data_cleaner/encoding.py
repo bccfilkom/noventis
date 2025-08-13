@@ -65,6 +65,7 @@ class NoventisEncoder:
         self.encoding_stats: Dict[str, Dict] = {}
         self.column_info: Dict[str, Dict] = {}
         self.is_fitted = False
+        self._original_df_snapshot = None 
         
         # Validation
         self._validate_parameters()
@@ -192,6 +193,8 @@ class NoventisEncoder:
                 return 'continuous'
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
+        self._original_df_snapshot = X.copy()
+
         if not isinstance(X, pd.DataFrame):
             raise TypeError("Input 'X' must be a pandas DataFrame.")
         
@@ -386,6 +389,28 @@ class NoventisEncoder:
             'is_fitted': self.is_fitted
         }
     
+    def get_summary_text(self) -> str:
+        """Generates a formatted string summary for the HTML report."""
+        if not self.is_fitted: return "<p>Encoder has not been fitted.</p>"
+        
+        summary_lines = []
+        method_counts = defaultdict(int)
+        for method in self.learned_cols.values(): method_counts[method] += 1
+        
+        summary_lines.append("<h4>Methods Used</h4><ul>")
+        for method, count in method_counts.items():
+            summary_lines.append(f"<li><b>{method.upper()}:</b> {count} columns</li>")
+        summary_lines.append("</ul>")
+
+        summary_lines.append("<h4>Detailed Analysis</h4><ul>")
+        for col, method in self.learned_cols.items():
+            info = self.column_info.get(col, {})
+            corr_text = f" | Correlation: {info.get('correlation_with_target', 0):.3f}" if self.method == 'auto' else ""
+            summary_lines.append(f"<li><b>{col}:</b> Method '{method.upper()}' (Unique Values: {info.get('unique_count', 'N/A')}{corr_text})</li>")
+        summary_lines.append("</ul>")
+        
+        return "".join(summary_lines)
+    
     def get_quality_report(self) -> Dict[str, any]:
 
         if not self.is_fitted:
@@ -438,88 +463,51 @@ class NoventisEncoder:
         
         return report
 
-    def plot_comparison(self, X: pd.DataFrame, max_cols: int = 1):
-        """
-        Membuat visualisasi perbandingan sebelum dan sesudah encoding,
-        yang beradaptasi dengan metode encoding yang digunakan.
-        """
-        if not self.is_fitted:
-            print("Encoder harus di-fit terlebih dahulu sebelum membuat plot.")
-            return
-
-        # Ambil kolom pertama yang di-encode untuk divisualisasikan
-        if not self.learned_cols:
-            print("Tidak ada kolom yang di-encode untuk divisualisasikan.")
-            return
-            
+    def plot_comparison(self, max_cols: int = 1):
+        if not self.is_fitted or not self.learned_cols: return None
+        
         col_to_plot = list(self.learned_cols.keys())[0]
         method_used = self.learned_cols[col_to_plot]
-
-        # Transform data untuk mendapatkan hasil 'sesudah'
-        df_before = X.copy()
-        df_after = self.transform(df_before.copy()) # Panggil transform di sini
-
-        fig, axes = plt.subplots(1, 2, figsize=(16, 7))
-        fig.suptitle(f"Perbandingan Encoder untuk Kolom '{col_to_plot}' (Metode: {method_used.upper()})", fontsize=16)
-
-        # --- PLOT KIRI: SEBELUM ENCODING ---
-        # Membuat count plot horizontal untuk keterbacaan yang lebih baik
-        top_n = 20 # Batasi jumlah kategori yang ditampilkan
-        order = df_before[col_to_plot].value_counts().nlargest(top_n).index
-        sns.countplot(y=df_before[col_to_plot], order=order, ax=axes[0], palette="viridis")
-        axes[0].set_title("Sebelum: Frekuensi Kategori")
-        axes[0].set_xlabel("Jumlah")
-        axes[0].set_ylabel("Kategori")
         
-        # Tambahkan info korelasi jika tersedia
-        if self.column_info and col_to_plot in self.column_info:
-            corr = self.column_info[col_to_plot].get('correlation_with_target', 0)
-            axes[0].text(0.95, 0.05, f"Korelasi (Cramér's V): {corr:.2f}", 
-                        transform=axes[0].transAxes, ha='right', va='bottom',
-                        bbox=dict(boxstyle='round,pad=0.5', fc='wheat', alpha=0.5))
+        df_before = self._original_df_snapshot
+        df_after = self.transform(df_before.copy())
 
+        color_before, color_after = '#58A6FF', '#F78166'
+        bg_color, text_color = '#0D1117', '#C9D1D9'
 
-        # --- PLOT KANAN: SESUDAH ENCODING ---
-        axes[1].set_title("Sesudah: Hasil Encoding")
-        
-        # Jika metode menghasilkan BANYAK kolom (OHE, Binary, Hashing) -> gunakan Heatmap
+        fig, axes = plt.subplots(1, 2, figsize=(18, 8), facecolor=bg_color)
+        fig.suptitle(f"Encoding Comparison for '{col_to_plot}' (Method: {method_used.upper()})",
+                     fontsize=20, color=text_color, weight='bold')
+
+        # --- BEFORE: Horizontal Count Plot ---
+        order = df_before[col_to_plot].value_counts().nlargest(20).index
+        sns.countplot(y=df_before[col_to_plot], order=order, ax=axes[0], color=color_before)
+        axes[0].set_title("Before: Top 20 Category Frequencies", color=text_color, fontsize=14)
+
+        # --- AFTER: Adaptive Visualization ---
+        axes[1].set_title("After: Encoded Result", color=text_color, fontsize=14)
         if method_used in ['ohe', 'binary', 'hashing']:
-            # Cari kolom baru yang relevan
             new_cols = [c for c in df_after.columns if c.startswith(f'{col_to_plot}_')]
-            if not new_cols and method_used == 'ohe': # Fallback untuk OHE scikit-learn
-                new_cols = self.encoders[col_to_plot].get_feature_names_out([col_to_plot])
-
             if new_cols:
-                # Ambil sampel 30 baris pertama untuk heatmap agar tidak terlalu ramai
-                sns.heatmap(df_after[new_cols].head(30), cmap="magma", ax=axes[1], cbar=False)
-                axes[1].set_xlabel("Fitur Baru yang Dihasilkan")
-                axes[1].set_ylabel("Sampel Baris Data")
-                axes[1].tick_params(axis='x', rotation=45)
+                sns.heatmap(df_after[new_cols].head(30), cmap="vlag", ax=axes[1], cbar=False)
+                axes[1].set_ylabel("Sample Rows")
             else:
-                axes[1].text(0.5, 0.5, "Tidak dapat menemukan kolom baru untuk heatmap.", ha='center', va='center')
-
-        # Jika metode menghasilkan SATU kolom (Label, Target, Ordinal) -> gunakan Histogram
-        elif method_used in ['label', 'target', 'ordinal']:
-            # Cari nama kolom baru
-            new_col_name = None
-            suffixes = ['_encoded', '_target_encoded', '_ordinal_encoded']
-            for suffix in suffixes:
-                if f'{col_to_plot}{suffix}' in df_after.columns:
-                    new_col_name = f'{col_to_plot}{suffix}'
-                    break
-            
+                axes[1].text(0.5, 0.5, "No new columns found for heatmap.", ha='center', va='center', color=text_color)
+        else: # label, target, ordinal
+            new_col_name = next((c for c in df_after.columns if col_to_plot in c), None)
             if new_col_name:
-                sns.histplot(df_after[new_col_name], kde=True, ax=axes[1], color='lightgreen')
-                axes[1].set_xlabel("Nilai Numerik Hasil Encoding")
-                axes[1].set_ylabel("Frekuensi")
+                sns.histplot(df_after[new_col_name], kde=True, ax=axes[1], color=color_after)
             else:
-                axes[1].text(0.5, 0.5, "Tidak dapat menemukan kolom baru untuk histogram.", ha='center', va='center')
-        
-        else:
-            axes[1].text(0.5, 0.5, f"Visualisasi untuk metode '{method_used}' tidak tersedia.", ha='center', va='center')
+                axes[1].text(0.5, 0.5, "Encoded column not found.", ha='center', va='center', color=text_color)
 
+        for ax in axes:
+            ax.set_facecolor(bg_color)
+            ax.tick_params(colors=text_color, which='both')
+            for spine in ax.spines.values(): spine.set_edgecolor(text_color)
+            ax.xaxis.label.set_color(text_color)
+            ax.yaxis.label.set_color(text_color)
 
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
         return fig
 
 
