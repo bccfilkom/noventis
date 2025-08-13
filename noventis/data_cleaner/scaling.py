@@ -63,6 +63,9 @@ class NoventisScaler:
         self.reasons_ = {}
         self.is_fitted_ = False
 
+        self.quality_report_ = {}
+        self._original_df_snapshot = None
+
     def _analyze_column(self, data: pd.Series) -> Dict[str, Any]:
         """Analyze a single column's distribution, skewness, outliers, and normality."""
         clean_data = data.dropna()
@@ -148,6 +151,8 @@ class NoventisScaler:
             X (pd.DataFrame): Input dataframe.
             is_for_knn (bool, optional): If True, force 'minmax' scaling for all columns. Defaults to False.
         """
+
+        self._original_df_snapshot = X.copy() 
         numeric_cols = X.select_dtypes(include=np.number).columns
         if numeric_cols.empty:
             raise ValueError("No numerical features to scale.")
@@ -218,3 +223,111 @@ class NoventisScaler:
             print(f"     - Reason: {self.reasons_[col]}")
             print(f"     - Skewness: {self.analysis_[col].get('skewness', 0):.2f} | Outlier Ratio: {self.analysis_[col].get('outlier_ratio', 0):.2%}")
         print("=" * 60)
+
+    def get_quality_report(self) -> Dict[str, Any]:
+        """
+        Menghasilkan laporan kualitas tentang perubahan statistik setelah scaling.
+        """
+        if not self.is_fitted_ or self._original_df_snapshot is None:
+            print("Scaler belum di-fit. Jalankan .fit() atau .fit_transform() terlebih dahulu.")
+            return {}
+        
+        transformed_df = self.transform(self._original_df_snapshot.copy())
+        
+        report = {'column_details': {}}
+        for col, analysis_before in self.analysis_.items():
+            if col in transformed_df.columns:
+                analysis_after = self._analyze_column(transformed_df[col])
+                report['column_details'][col] = {
+                    'method': self.fitted_methods_.get(col, 'N/A').upper(),
+                    'skewness_before': f"{analysis_before.get('skewness', 0):.3f}",
+                    'skewness_after': f"{analysis_after.get('skewness', 0):.3f}",
+                    'mean_before': f"{analysis_before.get('mean', 0):.3f}",
+                    'mean_after': f"{analysis_after.get('mean', 0):.3f}",
+                    'std_dev_before': f"{analysis_before.get('std', 0):.3f}",
+                    'std_dev_after': f"{analysis_after.get('std', 0):.3f}",
+                }
+        self.quality_report_ = report
+        return self.quality_report_
+        
+    def plot_comparison(self, max_cols: int = 5):
+        """
+        Membuat visualisasi perbandingan distribusi data sebelum dan sesudah scaling.
+        """
+        if not self.is_fitted_ or self._original_df_snapshot is None:
+            print("Scaler belum di-fit. Jalankan .fit() atau .fit_transform() terlebih dahulu.")
+            return
+
+        print("Membuat visualisasi perbandingan untuk scaling...")
+        
+        original_data = self._original_df_snapshot
+        transformed_data = self.transform(original_data.copy())
+        
+        cols_to_plot = list(self.scalers_.keys())[:max_cols]
+
+        for col in cols_to_plot:
+            if col not in transformed_data.columns:
+                continue
+                
+            fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+            fig.suptitle(f"Perbandingan Distribusi untuk Kolom '{col}' (Metode: {self.fitted_methods_[col].upper()})", fontsize=16)
+
+            # Plot Sebelum
+            sns.histplot(original_data[col], kde=True, ax=axes[0], color='skyblue')
+            axes[0].set_title(f"Sebelum Scaling")
+            axes[0].axvline(original_data[col].mean(), color='r', linestyle='--', label=f"Mean: {original_data[col].mean():.2f}")
+            axes[0].legend()
+
+            # Plot Sesudah
+            sns.histplot(transformed_data[col], kde=True, ax=axes[1], color='lightgreen')
+            axes[1].set_title(f"Sesudah Scaling")
+            axes[1].axvline(transformed_data[col].mean(), color='r', linestyle='--', label=f"Mean: {transformed_data[col].mean():.2f}")
+            axes[1].legend()
+
+            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+            plt.show()
+
+    def print_quality_report(self):
+        """
+        Analyzes data before and after scaling, then prints
+        a side-by-side data quality comparison report.
+        """
+        if not self.is_fitted_:
+            print("⚠️ Scaler must be fitted first. Run .fit() or .fit_transform().")
+            return
+        
+        if self._original_df_snapshot is None:
+            print("⚠️ Original data snapshot not found. Run .fit() on your data.")
+            return
+
+        print("📊" + "="*23 + " SCALING QUALITY REPORT " + "="*23 + "📊")
+        
+        # Get the before and after dataframes
+        df_before = self._original_df_snapshot
+        df_after = self.transform(df_before.copy())
+        
+        # Analyze both versions
+        report_before = assess_data_quality(df_before)
+        report_after = assess_data_quality(df_after)
+        
+        # Print the comparison
+        order = [
+            'completeness', 'datatype_purity', 'outlier_quality', 
+            'distribution_quality'
+        ]
+
+        print(f"{'METRIC':<25} | {'BEFORE':<12} | {'AFTER':<12}")
+        print("-" * 55)
+
+        for key in order:
+            if key in report_before and key in report_after:
+                title = key.replace('_', ' ').title()
+                score_before = report_before[key]['score']
+                score_after = report_after[key]['score']
+                
+                # Add an indicator for improvement
+                indicator = "✅" if score_after > score_before else "  "
+                
+                print(f"{title:<25} | {score_before:<12} | {score_after:<12} {indicator}")
+        
+        print("="*55)

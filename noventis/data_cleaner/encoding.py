@@ -7,6 +7,9 @@ import warnings
 from collections import defaultdict
 import logging
 from category_encoders import OrdinalEncoder, BinaryEncoder, HashingEncoder
+import matplotlib.pyplot as plt
+import seaborn as sns
+from data_quality import assess_data_quality 
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -156,6 +159,7 @@ class NoventisEncoder:
 
     def _recommend_encoding(self, unique_count: int, correlation: float, 
                           missing_ratio: float, memory_impact: float) -> str:
+        
         if unique_count == 2: return 'label'
         if unique_count > 50: return 'target' if correlation > 0.3 else 'hashing'
         if unique_count > 15:
@@ -379,3 +383,85 @@ class NoventisEncoder:
             'encoding_stats': self.encoding_stats, 'column_info': self.column_info,
             'is_fitted': self.is_fitted
         }
+    
+    def get_quality_report(self) -> Dict[str, any]:
+
+        if not self.is_fitted:
+            raise RuntimeError("Encoder belum di-fit. Jalankan .fit() atau .fit_transform() terlebih dahulu.")
+        
+        report = {
+            'method_summary': dict(self.learned_cols),
+            'column_details': {}
+        }
+        
+        total_original_cols = len(self.learned_cols)
+        total_new_cols = 0
+
+        for col, method in self.learned_cols.items():
+            info = self.column_info.get(col, {})
+            original_cardinality = info.get('unique_count', 'N/A')
+            
+            new_cols_count = 0
+            encoder = self.encoders.get(col)
+            if not encoder:
+                continue
+
+            if method == 'ohe':
+                if hasattr(encoder, 'get_feature_names_out'):
+                    new_cols_count = len(encoder.get_feature_names_out([col]))
+                else:
+                    new_cols_count = original_cardinality
+            elif method == 'binary':
+                 new_cols_count = len(encoder.get_feature_names())
+            elif method == 'hashing':
+                 new_cols_count = encoder.n_components
+            else: # label, target, ordinal
+                new_cols_count = 1
+            
+            total_new_cols += new_cols_count
+
+            report['column_details'][col] = {
+                'method': method.upper(),
+                'original_cardinality': original_cardinality,
+                'new_features_created': new_cols_count,
+            }
+
+        efficiency_score = (total_new_cols - total_original_cols) / total_original_cols if total_original_cols > 0 else 0
+        
+        report['overall_summary'] = {
+            'total_columns_encoded': total_original_cols,
+            'total_features_created': total_new_cols,
+            'dimensionality_change': f"{efficiency_score:+.2%}"
+        }
+        
+        return report
+
+    def plot_comparison(self, X: pd.DataFrame, max_cols: int = 3):
+
+        if not self.is_fitted:
+            raise RuntimeError("Encoder harus di-fit terlebih dahulu sebelum transform.")
+
+        print("Membuat visualisasi perbandingan untuk encoding...")
+        
+        transformed_data = self.transform(X.copy())
+
+        cols_to_plot = [col for col, method in self.learned_cols.items() if method in ['label', 'ohe', 'ordinal']][:max_cols]
+
+        if not cols_to_plot:
+            print("Tidak ada kolom dengan metode encoding yang cocok untuk divisualisasikan (misal: label, ohe).")
+            return
+
+        for col in cols_to_plot:
+            plt.figure(figsize=(10, 5))
+            
+            X[col].value_counts().nlargest(15).plot(kind='bar', color='skyblue', alpha=0.7)
+            
+            plt.title(f"Distribusi 15 Kategori Teratas untuk '{col}' (Sebelum Encoding)")
+            plt.ylabel("Frekuensi")
+            plt.xticks(rotation=45, ha='right')
+            plt.tight_layout()
+            plt.show()
+
+
+    
+    
