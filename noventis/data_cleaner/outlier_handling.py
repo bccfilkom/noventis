@@ -7,13 +7,8 @@ import seaborn as sns
 
 class NoventisOutlierHandler:
     """
-    Menangani outlier pada kolom numerik DataFrame dengan cerdas menggunakan
-    metode class-based yang konsisten dengan Scikit-Learn.
-
-    Mendukung metode 'auto', 'quantile_trim', 'iqr_trim', 'winsorize', dan 'none'.
-    Metode 'quantile_trim' dan 'iqr_trim' akan mengidentifikasi semua baris 
-    outlier dari semua kolom yang relevan terlebih dahulu, lalu menghapusnya
-    dalam satu operasi pada tahap transform.
+    Menangani outlier pada kolom numerik dengan metode cerdas.
+    Dilengkapi dengan laporan kualitas, ringkasan, dan visualisasi otomatis.
     """
 
     def __init__(self,
@@ -22,17 +17,17 @@ class NoventisOutlierHandler:
                  iqr_multiplier: float = 1.5,
                  quantile_range: Tuple[float, float] = (0.05, 0.95),
                  min_data_threshold: int = 100,
-                 skew_threshold: float = 1.0):
+                 skew_threshold: float = 1.0,
+                 verbose: bool = True):
         """
         Inisialisasi NoventisOutlierHandler.
 
         Args:
             feature_method_map (dict, optional): Peta untuk metode spesifik per kolom.
-            default_method (str): Metode fallback ('auto', 'quantile_trim', 'iqr_trim', 'winsorize', 'none'). 
-            iqr_multiplier (float): Pengali untuk metode 'iqr_trim'. 
-            quantile_range (tuple): Batas kuantil untuk 'quantile_trim' dan 'winsorize'. 
-            min_data_threshold (int): Batas data untuk metode 'auto' memilih 'iqr_trim'. 
-            skew_threshold (float): Batas skewness untuk metode 'auto'.
+            default_method (str): Metode fallback ('auto', 'quantile_trim', 'iqr_trim', 'winsorize', 'none').
+            iqr_multiplier (float): Pengali untuk metode 'iqr_trim'.
+            quantile_range (tuple): Batas kuantil untuk 'quantile_trim' dan 'winsorize'.
+            verbose (bool, optional): Jika True, cetak ringkasan setelah fit. Defaults to True.
         """
         self.feature_method_map = feature_method_map or {}
         self.default_method = default_method or 'auto'
@@ -40,176 +35,166 @@ class NoventisOutlierHandler:
         self.quantile_range = quantile_range
         self.min_data_threshold = min_data_threshold
         self.skew_threshold = skew_threshold
+        self.verbose = verbose
 
+        # --- Atribut Internal ---
         self.is_fitted_ = False
         self.boundaries_: Dict[str, Tuple[float, float]] = {}
         self.methods_: Dict[str, str] = {}
+        self.reasons_: Dict[str, str] = {}
         self.indices_to_drop_: Set[int] = set()
-
-        # Atribut baru untuk laporan
+        
+        # --- Atribut Laporan & Visualisasi ---
         self.quality_report_: Dict[str, Any] = {}
         self._original_df_snapshot: Optional[pd.DataFrame] = None
 
-    def _choose_auto_method(self, col_data: pd.Series) -> str:
-        """Fungsi helper untuk memilih metode otomatis."""
+    # --- Metode Inti ---
+
+    def _choose_auto_method(self, col_data: pd.Series) -> Tuple[str, str]:
+        """Fungsi helper untuk memilih metode otomatis dan alasannya."""
         if len(col_data.dropna()) < self.min_data_threshold:
-            return 'iqr_trim' 
+            return 'iqr_trim', f"Data < {self.min_data_threshold} samples"
         elif abs(skew(col_data.dropna())) > self.skew_threshold:
-            return 'winsorize'
+            return 'winsorize', f"High skewness ({abs(skew(col_data.dropna())):.2f})"
         else:
-            return 'quantile_trim' 
+            return 'quantile_trim', "Default fallback"
 
     def fit(self, X: pd.DataFrame, y=None) -> 'NoventisOutlierHandler':
-        """
-        Mempelajari batas outlier dari data training X.
-        """
-        df = X.copy()
-        self._original_df_snapshot = df # <-- Simpan snapshot data asli
-        self.boundaries_ = {}
-        self.methods_ = {}
-        self.indices_to_drop_ = set()
+        self._original_df_snapshot = X.copy()
+        self.boundaries_, self.methods_, self.reasons_, self.indices_to_drop_ = {}, {}, {}, set()
 
-        for col in df.select_dtypes(include=np.number).columns:
-            # Penanganan edge case jika kolom tidak bervariasi
-            if df[col].nunique() <= 1: 
-                continue               
+        for col in X.select_dtypes(include=np.number).columns:
+            if X[col].nunique() <= 1: continue
 
             method = self.feature_method_map.get(col, self.default_method)
+            reason = "Forced by user"
             if method == 'auto':
-                method = self._choose_auto_method(df[col])
+                method, reason = self._choose_auto_method(X[col])
 
             self.methods_[col] = method
-
-            if method == 'none':
-                continue
+            self.reasons_[col] = reason
+            if method == 'none': continue
 
             lower_bound, upper_bound = None, None
-            if method in ['quantile_trim', 'winsorize']: 
-                q_low, q_high = df[col].quantile(self.quantile_range)
+            if method in ['quantile_trim', 'winsorize']:
+                q_low, q_high = X[col].quantile(self.quantile_range)
                 lower_bound, upper_bound = q_low, q_high
-            elif method == 'iqr_trim': 
-                Q1 = df[col].quantile(0.25)
-                Q3 = df[col].quantile(0.75)
+            elif method == 'iqr_trim':
+                Q1, Q3 = X[col].quantile(0.25), X[col].quantile(0.75)
                 IQR = Q3 - Q1
-                lower_bound = Q1 - self.iqr_multiplier * IQR
-                upper_bound = Q3 + self.iqr_multiplier * IQR
+                lower_bound, upper_bound = Q1 - self.iqr_multiplier * IQR, Q3 + self.iqr_multiplier * IQR
 
             self.boundaries_[col] = (lower_bound, upper_bound)
-
             if method in ['quantile_trim', 'iqr_trim']:
-                outlier_indices = df.index[(df[col] < lower_bound) | (df[col] > upper_bound)]
+                outlier_indices = X.index[(X[col] < lower_bound) | (X[col] > upper_bound)]
                 self.indices_to_drop_.update(outlier_indices)
         
         self.is_fitted_ = True
+        
+        # Panggil ringkasan jika verbose, tapi laporan lengkap dibuat di transform
+        if self.verbose:
+            self._print_summary(X)
+            
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """
-        Menerapkan penanganan outlier ke DataFrame.
-        """
         if not self.is_fitted_:
-            raise RuntimeError("Handler harus di-fit terlebih dahulu sebelum transform.")
+            raise RuntimeError("Handler harus di-fit terlebih dahulu.")
         
         df_out = X.copy()
-
         for col, method in self.methods_.items():
-            # Pengecekan robustness jika kolom tidak ada di data transform
-            if col not in df_out.columns: 
-                continue                  
-            
+            if col not in df_out.columns: continue
             if method == 'winsorize':
                 lower_bound, upper_bound = self.boundaries_[col]
                 df_out[col] = np.clip(df_out[col], lower_bound, upper_bound)
 
         if self.indices_to_drop_:
-            # Pastikan hanya drop indeks yang ada di dataframe saat ini
-            indices_in_df = self.indices_to_drop_.intersection(df_out.index) 
-            df_out.drop(index=list(indices_in_df), inplace=True) 
-            
-        rows_before = len(X)
-        rows_after = len(df_out)
-        outliers_removed = rows_before - rows_after
-        removal_percentage = (outliers_removed / rows_before * 100) if rows_before > 0 else 0
-
-        self.quality_report_ = {
-            'rows_before': rows_before,
-            'rows_after': rows_after,
-            'outliers_removed': outliers_removed,
-            'removal_percentage': f"{removal_percentage:.2f}%"
-        }
+            indices_in_df = self.indices_to_drop_.intersection(df_out.index)
+            df_out.drop(index=list(indices_in_df), inplace=True)
+        
+        self._create_quality_report(X, df_out)
         return df_out
 
     def fit_transform(self, X: pd.DataFrame, y=None) -> pd.DataFrame:
-        """
-        Melakukan fit dan transform dalam satu langkah.
-        """
-        return self.fit(X).transform(X)
-    
-    # Tambahkan metode baru ini di dalam kelas NoventisOutlierHandler
+        return self.fit(X, y).transform(X)
+
+    # --- Metode Laporan & Visualisasi ---
+
+    def _create_quality_report(self, df_before: pd.DataFrame, df_after: pd.DataFrame):
+        """Membuat laporan kualitas lengkap setelah transformasi."""
+        report = {'overall_summary': {}, 'column_details': {}}
+        rows_before = len(df_before)
+        rows_after = len(df_after)
+        rows_removed = rows_before - rows_after
+        retained_score = (rows_after / rows_before * 100) if rows_before > 0 else 100.0
+
+        report['overall_summary'] = {
+            'rows_before': rows_before,
+            'rows_after': rows_after,
+            'outliers_removed (rows)': rows_removed,
+            'data_retained_score': f"{retained_score:.2f}%"
+        }
+
+        for col, method in self.methods_.items():
+            report['column_details'][col] = {
+                'method': method.upper(),
+                'reason': self.reasons_.get(col, 'N/A')
+            }
+        self.quality_report_ = report
 
     def get_quality_report(self) -> Dict[str, Any]:
-        """
-        Mengembalikan ringkasan statistik dan skor dari proses penanganan outlier.
-
-        Returns:
-            dict: Kamus berisi metrik sebelum dan sesudah proses.
-        """
+        """Mengembalikan laporan kualitas detail dari proses penanganan outlier."""
         if not self.is_fitted_:
-            print("Handler belum di-fit. Jalankan .fit() atau .fit_transform() terlebih dahulu.")
+            print("Handler belum di-fit.")
             return {}
         return self.quality_report_
 
-    def plot_comparison(self, max_cols: int = 5):
-        """
-        Membuat visualisasi perbandingan distribusi data sebelum dan sesudah 
-        penanganan outlier untuk beberapa kolom numerik.
+    def _print_summary(self, X: pd.DataFrame):
+        """Mencetak ringkasan yang mudah dibaca ke konsol."""
+        # Perlu .transform() dummy untuk mendapatkan hasil akhir
+        df_after = self.transform(X.copy())
+        report = self.get_quality_report()
+        summary = report.get('overall_summary', {})
+        
+        print("\n📋" + "="*23 + " OUTLIER HANDLING SUMMARY " + "="*23 + "📋")
+        print(f"{'Method':<25} | {self.default_method.upper() if self.default_method == 'auto' else 'CUSTOM MAP'}")
+        print(f"{'Total Rows Removed':<25} | {summary.get('outliers_removed (rows)', 'N/A')}")
+        print(f"{'Data Retained Score':<25} | {summary.get('data_retained_score', 'N/A')}")
+        print("="*72)
 
-        Args:
-            max_cols (int): Jumlah maksimum kolom yang akan divisualisasikan.
-        """
+    def plot_comparison(self, max_cols: int = 3, color_before: str = '#FF6849', color_after: str = '#31B7AE'):
         if not self.is_fitted_ or self._original_df_snapshot is None:
-            print("Handler belum di-fit. Jalankan .fit() atau .fit_transform() terlebih dahulu.")
+            print("Handler belum di-fit.")
             return
 
-        # Ambil data setelah transform (perlu panggil transform lagi jika belum ada)
-        # Cara sederhana: asumsikan pengguna memanggil ini setelah fit_transform
-        # Cara lebih robust: perlu menyimpan df_out, tapi bisa memakan memori.
-        # Kita mulai dengan cara sederhana.
-
-        print("Membuat visualisasi perbandingan...")
+        print("\n📈 Membuat visualisasi perbandingan untuk penanganan outlier...")
         
-        # Ambil hanya kolom yang diproses
-        cols_to_plot = list(self.methods_.keys())[:max_cols]
-        
-        # DataFrame asli dan yang sudah ditransformasi (dengan asumsi baris yang sama)
         original_data = self._original_df_snapshot
-        # Untuk perbandingan, kita perlu data transform, tapi karena baris bisa hilang,
-        # kita perlu cara untuk membandingkannya. Salah satu caranya adalah plot distribusi.
-        
-        # Untuk plot ini, kita akan panggil transform lagi secara internal
-        # Ini tidak efisien, tapi paling mudah untuk perbandingan visual
         transformed_data = self.transform(original_data.copy())
+        cols_to_plot = [col for col in self.methods_ if self.methods_[col] != 'none'][:max_cols]
+
+        if not cols_to_plot:
+            print("Tidak ada kolom yang diproses untuk divisualisasikan.")
+            return
 
         for col in cols_to_plot:
-            if col not in transformed_data.columns:
-                continue
+            if col not in original_data.columns: continue
                 
             fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-            fig.suptitle(f"Perbandingan Distribusi untuk Kolom '{col}'", fontsize=16)
-
+            fig.suptitle(f"Perbandingan Distribusi untuk Kolom '{col}' (Metode: {self.methods_[col].upper()})", fontsize=16)
+            
             # Plot Sebelum
-            sns.histplot(original_data[col], kde=True, ax=axes[0], color='skyblue')
-            axes[0].set_title(f"Sebelum ({self.quality_report_['rows_before']} baris)")
-            axes[0].axvline(original_data[col].mean(), color='r', linestyle='--', label='Mean')
-            axes[0].axvline(original_data[col].median(), color='g', linestyle='-', label='Median')
-            axes[0].legend()
+            sns.histplot(original_data[col], kde=True, ax=axes[0], color=color_before)
+            axes[0].set_title(f"Sebelum ({len(original_data)} baris)")
+            axes[0].legend(['Mean', 'Median'])
 
             # Plot Sesudah
-            sns.histplot(transformed_data[col], kde=True, ax=axes[1], color='lightgreen')
-            axes[1].set_title(f"Sesudah ({self.quality_report_['rows_after']} baris)")
-            axes[1].axvline(transformed_data[col].mean(), color='r', linestyle='--', label='Mean')
-            axes[1].axvline(transformed_data[col].median(), color='g', linestyle='-', label='Median')
-            axes[1].legend()
+            if col in transformed_data.columns:
+                sns.histplot(transformed_data[col], kde=True, ax=axes[1], color=color_after)
+                axes[1].set_title(f"Sesudah ({len(transformed_data)} baris)")
+                axes[1].legend(['Mean', 'Median'])
+            else:
+                axes[1].text(0.5, 0.5, 'Kolom dihapus', ha='center', va='center')
 
             plt.tight_layout(rect=[0, 0.03, 1, 0.95])
             plt.show()
