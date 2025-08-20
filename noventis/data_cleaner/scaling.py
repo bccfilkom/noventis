@@ -9,7 +9,7 @@ from sklearn.preprocessing import (
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Default parameter setiap metode scaling
+# Default parameters for each scaling method
 LIST_SCALER = {
     "standard": {"with_mean": True, "with_std": True},
     "minmax": {"feature_range": (0, 1)},
@@ -229,10 +229,10 @@ class NoventisScaler:
 
     def get_quality_report(self) -> Dict[str, Any]:
         """
-        Menghasilkan laporan kualitas tentang perubahan statistik setelah scaling.
+        Generate quality report about statistical changes after scaling.
         """
         if not self.is_fitted_ or self._original_df_snapshot is None:
-            print("Scaler belum di-fit. Jalankan .fit() atau .fit_transform() terlebih dahulu.")
+            print("Scaler has not been fitted. Run .fit() or .fit_transform() first.")
             return {}
         
         transformed_df = self.transform(self._original_df_snapshot.copy())
@@ -255,6 +255,7 @@ class NoventisScaler:
 
 
     def plot_comparison(self, max_cols: int = 1):
+        """Plot before/after comparison of scaling results."""
         if not self.is_fitted_ or self._original_df_snapshot is None: return None
         cols_to_plot = list(self.scalers_.keys())[:max_cols]
         if not cols_to_plot: return None
@@ -318,7 +319,7 @@ class NoventisScaler:
         return summary_html
 
     def print_quality_report(self):
-
+        """Print quality report comparing before and after scaling metrics."""
         if not self.is_fitted_:
             print("⚠️ Scaler must be fitted first. Run .fit() or .fit_transform().")
             return
