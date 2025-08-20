@@ -7,34 +7,34 @@ import seaborn as sns
 
 class NoventisImputer:
     """
-    Menangani nilai yang hilang (null/NaN) secara cerdas dengan metode class-based.
+    Intelligently handles missing values (null/NaN) using a class-based approach.
     
-    Fitur:
-    - Sesuai dengan API Scikit-learn (fit, transform).
-    - Deteksi otomatis tipe kolom (numerik & kategorikal).
-    - Mendukung metode: 'mean', 'median', 'mode', 'knn', 'constant', 'ffill', 'bfill', 'drop'.
-    - Fleksibel: dapat menerima metode global (string) atau per kolom (dictionary).
-    - Penanganan khusus untuk kolom integer (pembulatan otomatis).
+    Features:
+    - Compatible with Scikit-learn API (fit, transform).
+    - Automatic detection of column types (numeric & categorical).
+    - Supports methods: 'mean', 'median', 'mode', 'knn', 'constant', 'ffill', 'bfill', 'drop'.
+    - Flexible: accepts global method (string) or per-column method (dictionary).
+    - Special handling for integer columns (automatic rounding).
     """
 
     def __init__(self, 
-                 method: Optional[str] = None, 
-                 columns: Optional[List[str]] = None,
-                 fill_value: Any = None,
-                 n_neighbors: int = 5, 
-                 verbose: bool = True):
+                method: Optional[str] = None, 
+                columns: Optional[List[str]] = None,
+                fill_value: Any = None,
+                n_neighbors: int = 5, 
+                verbose: bool = True):
         """
-        Inisialisasi NoventisImputer.
+        Initialize NoventisImputer.
 
         Args:
             method (str, dict, or None): 
-                - str: 'mean', 'median', 'mode', 'knn', 'constant', 'ffill', 'bfill', 'drop' untuk semua kolom.
-                - dict: Metode spesifik per kolom, misal: {'Usia': 'median'}.
-                - None: Mode otomatis ('mean' untuk numerik, 'mode' untuk kategorikal).
-            columns (list, optional): Daftar kolom spesifik yang ingin diproses. 
-                                      Jika None, proses semua kolom yang relevan.
-            fill_value (any, optional): Nilai yang digunakan jika method='constant'.
-            n_neighbors (int): Jumlah tetangga untuk metode 'knn'.
+                - str: 'mean', 'median', 'mode', 'knn', 'constant', 'ffill', 'bfill', 'drop' for all columns.
+                - dict: Specific method per column, e.g.: {'Age': 'median'}.
+                - None: Auto mode ('mean' for numeric, 'mode' for categorical).
+            columns (list, optional): List of specific columns to process. 
+                                    If None, process all relevant columns.
+            fill_value (any, optional): Value to use when method='constant'.
+            n_neighbors (int): Number of neighbors for 'knn' method.
         """
         self.method = method
         self.columns = columns
@@ -51,20 +51,20 @@ class NoventisImputer:
 
     def fit(self, X: pd.DataFrame, y=None) -> 'NoventisImputer':
         """
-        Mempelajari strategi imputasi dari data training X.
+        Learn imputation strategy from training data X.
         """
         df = X.copy()
         self._original_df_snapshot = df
         self.imputers_ = {}
         
-        # Tentukan kolom yang akan diproses
+        # Determine columns to process
         cols_with_null = [col for col in df.columns if df[col].isnull().sum() > 0]
         if self.columns:
             self.columns_to_process_ = [col for col in self.columns if col in cols_with_null]
         else:
             self.columns_to_process_ = cols_with_null
 
-        # Penanganan khusus dan efisien untuk KNN
+        # Special and efficient handling for KNN
         if self.method == 'knn':
             num_cols = [c for c in df.select_dtypes(include=np.number).columns if c in self.columns_to_process_]
             cat_cols = [c for c in df.select_dtypes(include='object').columns if c in self.columns_to_process_]
@@ -74,22 +74,22 @@ class NoventisImputer:
                 knn_imputer.fit(df[num_cols])
                 self.imputers_['knn'] = {'imputer': knn_imputer, 'cols': num_cols}
 
-            # Untuk kolom kategorikal dalam mode KNN, gunakan mode sebagai fallback
+            # For categorical columns in KNN mode, use mode as fallback
             for col in cat_cols:
                 imp = SimpleImputer(strategy='most_frequent')
                 self.imputers_[col] = imp.fit(df[[col]])
         else:
-            # Penanganan untuk metode lain (per kolom)
+            # Handling for other methods (per column)
             for col in self.columns_to_process_:
                 chosen_method = self.method
                 if isinstance(self.method, dict):
                     chosen_method = self.method.get(col, None)
                 
-                # Fallback Otomatis
+                # Automatic Fallback
                 if chosen_method is None:
                     chosen_method = 'mean' if pd.api.types.is_numeric_dtype(df[col]) else 'mode'
                 
-                # Metode yang tidak butuh fitting
+                # Methods that don't need fitting
                 if chosen_method in ['drop', 'ffill', 'bfill']:
                     self.imputers_[col] = chosen_method
                     continue
@@ -99,7 +99,7 @@ class NoventisImputer:
                 is_numeric = pd.api.types.is_numeric_dtype(df[col])
 
                 if chosen_method == 'mean' and is_numeric:
-                    # Cek apakah kolom berisi integer untuk pembulatan
+                    # Check if column contains integers for rounding
                     if np.all(df[col].dropna() % 1 == 0):
                         strategy = 'constant'
                         fill_val = round(df[col].mean())
@@ -111,8 +111,8 @@ class NoventisImputer:
                     strategy = 'most_frequent'
                 elif chosen_method == 'constant':
                     strategy = 'constant'
-                    fill_val = self.fill_value # Menggunakan fill_value dari user
-                else: # Fallback untuk kategorikal
+                    fill_val = self.fill_value # Use fill_value from user
+                else: # Fallback for categorical
                     strategy = 'most_frequent'
                 
                 imp = SimpleImputer(strategy=strategy, fill_value=fill_val)
@@ -126,7 +126,7 @@ class NoventisImputer:
         else:
             cols_to_process = cols_with_null
             
-        # Simpan kolom yang akan diproses untuk digunakan nanti
+        # Store columns to be processed for later use
         self.columns_to_process_ = cols_to_process
 
         if not self.columns_to_process_:
@@ -145,22 +145,22 @@ class NoventisImputer:
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Menerapkan imputasi nilai hilang ke DataFrame.
+        Apply missing value imputation to DataFrame.
         """
         if not self.is_fitted_:
-            raise RuntimeError("Imputer harus di-fit terlebih dahulu sebelum transform.")
+            raise RuntimeError("Imputer must be fitted before transform.")
             
         df_out = X.copy()
         
         # Handle KNN
         if 'knn' in self.imputers_:
             knn_info = self.imputers_['knn']
-            # Pastikan kolom ada di dataframe transform
+            # Ensure columns exist in transform dataframe
             cols_to_transform = [c for c in knn_info['cols'] if c in df_out.columns]
             if cols_to_transform:
                 df_out[cols_to_transform] = knn_info['imputer'].transform(df_out[cols_to_transform])
         
-        # Handle metode lainnya
+        # Handle other methods
         for col, imputer in self.imputers_.items():
             if col == 'knn' or col not in df_out.columns:
                 continue
@@ -175,7 +175,7 @@ class NoventisImputer:
         if not self.columns_to_process_:
             missing_after = 0
         else:
-            # Pastikan hanya menghitung di kolom yang ada di df_out
+            # Ensure we only count in columns that exist in df_out
             processed_cols_in_df = [col for col in self.columns_to_process_ if col in df_out.columns]
             missing_after = df_out[processed_cols_in_df].isnull().sum().sum()
 
@@ -195,14 +195,14 @@ class NoventisImputer:
 
     def fit_transform(self, X: pd.DataFrame, y=None) -> pd.DataFrame:
         """
-        Melakukan fit dan transform dalam satu langkah.
+        Perform fit and transform in one step.
         """
         return self.fit(X, y).transform(X)
     
     def get_quality_report(self) -> Dict[str, Any]:
-        """Menghitung dan mengembalikan laporan kualitas detail dari proses imputasi."""
+        """Calculate and return detailed quality report from imputation process."""
         if not self.is_fitted_ or self._original_df_snapshot is None:
-            print("Imputer belum di-fit.")
+            print("Imputer has not been fitted.")
             return {}
 
         df_before = self._original_df_snapshot
@@ -232,7 +232,7 @@ class NoventisImputer:
         return self.quality_report_
 
     def _print_summary(self):
-        """Mencetak ringkasan yang mudah dibaca ke konsol."""
+        """Print an easy-to-read summary to console."""
         report = self.get_quality_report()
         summary = report.get('overall_summary', {})
         
@@ -265,7 +265,9 @@ class NoventisImputer:
             <p>In 'auto' mode, 'mean' is used for numeric columns and 'mode' for categorical columns.</p>
         """
         return summary_html
+    
     def plot_comparison(self, max_cols: int = 1):
+        """Plot before/after comparison of imputation results."""
         if not self.is_fitted_ or self._original_df_snapshot is None: return None
 
         original_data = self._original_df_snapshot

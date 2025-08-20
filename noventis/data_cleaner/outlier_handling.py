@@ -7,33 +7,33 @@ import seaborn as sns
 
 class NoventisOutlierHandler:
     """
-    Menangani outlier pada kolom numerik DataFrame dengan cerdas menggunakan
-    metode class-based yang konsisten dengan Scikit-Learn.
+    Intelligently handles outliers in DataFrame numeric columns using
+    a class-based method consistent with Scikit-Learn.
 
-    Mendukung metode 'auto', 'quantile_trim', 'iqr_trim', 'winsorize', dan 'none'.
-    Metode 'quantile_trim' dan 'iqr_trim' akan mengidentifikasi semua baris 
-    outlier dari semua kolom yang relevan terlebih dahulu, lalu menghapusnya
-    dalam satu operasi pada tahap transform.
+    Supports methods 'auto', 'quantile_trim', 'iqr_trim', 'winsorize', and 'none'.
+    The 'quantile_trim' and 'iqr_trim' methods will first identify all outlier 
+    rows from all relevant columns, then remove them in one operation during 
+    the transform stage.
     """
 
     def __init__(self,
-                 feature_method_map: Optional[Dict[str, str]] = None,
-                 default_method: str = 'auto',
-                 iqr_multiplier: float = 1.5,
-                 quantile_range: Tuple[float, float] = (0.05, 0.95),
-                 min_data_threshold: int = 100,
-                 skew_threshold: float = 1.0,
-                 verbose: bool = True):
+                feature_method_map: Optional[Dict[str, str]] = None,
+                default_method: str = 'auto',
+                iqr_multiplier: float = 1.5,
+                quantile_range: Tuple[float, float] = (0.05, 0.95),
+                min_data_threshold: int = 100,
+                skew_threshold: float = 1.0,
+                verbose: bool = True):
         """
-        Inisialisasi NoventisOutlierHandler.
+        Initialize NoventisOutlierHandler.
 
         Args:
-            feature_method_map (dict, optional): Peta untuk metode spesifik per kolom.
-            default_method (str): Metode fallback ('auto', 'quantile_trim', 'iqr_trim', 'winsorize', 'none'). 
-            iqr_multiplier (float): Pengali untuk metode 'iqr_trim'. 
-            quantile_range (tuple): Batas kuantil untuk 'quantile_trim' dan 'winsorize'. 
-            min_data_threshold (int): Batas data untuk metode 'auto' memilih 'iqr_trim'. 
-            skew_threshold (float): Batas skewness untuk metode 'auto'.
+            feature_method_map (dict, optional): Map for specific method per column.
+            default_method (str): Fallback method ('auto', 'quantile_trim', 'iqr_trim', 'winsorize', 'none'). 
+            iqr_multiplier (float): Multiplier for 'iqr_trim' method. 
+            quantile_range (tuple): Quantile bounds for 'quantile_trim' and 'winsorize'. 
+            min_data_threshold (int): Data threshold for 'auto' method to choose 'iqr_trim'. 
+            skew_threshold (float): Skewness threshold for 'auto' method.
         """
         self.feature_method_map = feature_method_map or {}
         self.default_method = default_method or 'auto'
@@ -48,12 +48,12 @@ class NoventisOutlierHandler:
         self.methods_: Dict[str, str] = {}
         self.indices_to_drop_: Set[int] = set()
 
-        # Atribut baru untuk laporan
+        # New attributes for reporting
         self.quality_report_: Dict[str, Any] = {}
         self._original_df_snapshot: Optional[pd.DataFrame] = None
 
     def _choose_auto_method(self, col_data: pd.Series) -> str:
-        """Fungsi helper untuk memilih metode otomatis."""
+        """Helper function to choose automatic method."""
         if len(col_data.dropna()) < self.min_data_threshold:
             return 'iqr_trim' 
         elif abs(skew(col_data.dropna())) > self.skew_threshold:
@@ -63,16 +63,16 @@ class NoventisOutlierHandler:
 
     def fit(self, X: pd.DataFrame, y=None) -> 'NoventisOutlierHandler':
         """
-        Mempelajari batas outlier dari data training X.
+        Learn outlier boundaries from training data X.
         """
         df = X.copy()
-        self._original_df_snapshot = df # <-- Simpan snapshot data asli
+        self._original_df_snapshot = df # <-- Save original data snapshot
         self.boundaries_ = {}
         self.methods_ = {}
         self.indices_to_drop_ = set()
 
         for col in df.select_dtypes(include=np.number).columns:
-            # Penanganan edge case jika kolom tidak bervariasi
+            # Handle edge case if column has no variation
             if df[col].nunique() <= 1: 
                 continue               
 
@@ -111,15 +111,15 @@ class NoventisOutlierHandler:
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Menerapkan penanganan outlier ke DataFrame.
+        Apply outlier handling to DataFrame.
         """
         if not self.is_fitted_:
-            raise RuntimeError("Handler harus di-fit terlebih dahulu sebelum transform.")
+            raise RuntimeError("Handler must be fitted before transform.")
         
         df_out = X.copy()
 
         for col, method in self.methods_.items():
-            # Pengecekan robustness jika kolom tidak ada di data transform
+            # Robustness check if column doesn't exist in transform data
             if col not in df_out.columns: 
                 continue                  
             
@@ -128,7 +128,7 @@ class NoventisOutlierHandler:
                 df_out[col] = np.clip(df_out[col], lower_bound, upper_bound)
 
         if self.indices_to_drop_:
-            # Pastikan hanya drop indeks yang ada di dataframe saat ini
+            # Ensure only drop indices that exist in current dataframe
             indices_in_df = self.indices_to_drop_.intersection(df_out.index) 
             df_out.drop(index=list(indices_in_df), inplace=True) 
             
@@ -147,19 +147,20 @@ class NoventisOutlierHandler:
 
     def fit_transform(self, X: pd.DataFrame, y=None) -> pd.DataFrame:
         """
-        Melakukan fit dan transform dalam satu langkah.
+        Perform fit and transform in one step.
         """
         return self.fit(X).transform(X)
+    
     def get_quality_report(self) -> Dict[str, Any]:
-        """Mengembalikan laporan kualitas detail dari proses penanganan outlier."""
+        """Return detailed quality report from outlier handling process."""
         if not self.is_fitted_:
-            print("Handler belum di-fit.")
+            print("Handler has not been fitted.")
             return {}
         return self.quality_report_
 
     def _print_summary(self, X: pd.DataFrame):
-        """Mencetak ringkasan yang mudah dibaca ke konsol."""
-        # Perlu .transform() dummy untuk mendapatkan hasil akhir
+        """Print an easy-to-read summary to console."""
+        # Need dummy .transform() to get final results
         df_after = self.transform(X.copy())
         report = self.get_quality_report()
         summary = report.get('overall_summary', {})
@@ -169,6 +170,7 @@ class NoventisOutlierHandler:
         print(f"{'Total Rows Removed':<25} | {summary.get('outliers_removed (rows)', 'N/A')}")
         print(f"{'Data Retained Score':<25} | {summary.get('data_retained_score', 'N/A')}")
         print("="*72)
+    
     def get_summary_text(self) -> str:
         """Generates a formatted string summary for the HTML report."""
         if not self.is_fitted_: return "<p>Outlier Handler has not been fitted.</p>"
@@ -191,6 +193,7 @@ class NoventisOutlierHandler:
         return summary_html
 
     def plot_comparison(self, max_cols: int = 1):
+        """Plot before/after comparison of outlier handling results."""
         if not self.is_fitted_ or self._original_df_snapshot is None: return None
         cols_to_plot = [col for col, method in self.methods_.items() if method != 'none']
         if not cols_to_plot: return None
@@ -205,7 +208,7 @@ class NoventisOutlierHandler:
         fig = plt.figure(figsize=(16, 8), facecolor=bg_color)
         gs = fig.add_gridspec(2, 2, height_ratios=(3, 1), hspace=0.05)
         fig.suptitle(f"Outlier Handling Comparison for '{col_to_plot}' (Method: {self.methods_[col_to_plot].upper()})",
-                     fontsize=20, color=text_color, weight='bold')
+                    fontsize=20, color=text_color, weight='bold')
 
         # --- BEFORE ---
         ax_hist_before = fig.add_subplot(gs[0, 0])
