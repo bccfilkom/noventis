@@ -1,22 +1,15 @@
 Metadata-Version: 2.4
 Name: noventis
 Version: 0.1.0
-Summary: A data cleaning and analysis toolkit.
+Summary: A custom data cleaning library.
 Author: Your Name
-Author-email: your.email@example.com
+Author-email: Nama Anda <email@anda.com>
 Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.8
-Requires-Dist: numpy>=1.24
-Requires-Dist: pandas>=2.0.3
-Requires-Dist: scikit-learn>=1.3
-Requires-Dist: matplotlib>=3.7
-Requires-Dist: seaborn>=0.12
-Requires-Dist: scipy>=1.7.0
-Requires-Dist: category_encoders>=2.5.0
+Description-Content-Type: text/markdown
 Dynamic: author
-Dynamic: author-email
-Dynamic: classifier
-Dynamic: requires-dist
 Dynamic: requires-python
-Dynamic: summary
+
+# Noventis-Data
