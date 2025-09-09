@@ -104,8 +104,7 @@ class NoventisAutoML:
         print(f"✅ Data berhasil dibagi: Train={len(self.X_train)}, Test={len(self.X_test)}")
         print(f"📈 Target distribution: {dict(y.value_counts()) if self.task_type == 'classification' else f'Range: {y.min():.2f} - {y.max():.2f}'}")
 
-    def fit(self, time_budget: int = 60, metric: Optional[str] = None, explain: bool = True, 
-            compare: bool = False, **kwargs) -> Dict:
+    def fit(self, time_budget: int = 60, metric: Optional[str] = None) -> Dict:
         """
         Melatih model AutoML dengan FLAML
         
@@ -121,100 +120,108 @@ class NoventisAutoML:
         # Convert metric untuk FLAML
         flaml_metric = self._convert_metric_to_flaml(self.metrics)
         
-        # Initialize FLAML AutoML
-        self.flaml_model = FLAMLAutoML(
-            task=self.task_type, 
-            metric=flaml_metric, 
-            seed=self.random_state, 
-            verbose=2,
-            **kwargs
-        )
-        
-        # Buat direktori output
-        os.makedirs(self.output_dir, exist_ok=True)
-        
-        print(f"⏳ Melatih model (Metrik: {flaml_metric}, Waktu: {time_budget}s)...")
-        
-        # Training model
-        self.flaml_model.fit(
-            X_train=self.X_train, 
-            y_train=self.y_train,
-            estimator_list=self.model_list,
-            log_file_name=f'{self.output_dir}/flaml.log', 
-            time_budget=self.time_budget,
-        )
-        
-        # Prediksi
-        y_pred = self.flaml_model.predict(self.X_test)
-        
-        # Evaluasi berdasarkan task type
-        if self.task_type == "classification":
-            metrics = self._eval_classification(self.y_test, y_pred)
-            y_pred_proba = self.flaml_model.predict_proba(self.X_test) if hasattr(self.flaml_model, 'predict_proba') else None
-        else:
-            metrics = self._eval_regression(self.y_test, y_pred)
-            y_pred_proba = None
-        
-        # Compile results
-        self.results = {
-            'model': self.flaml_model,
-            'predictions': y_pred,
-            'prediction_proba': y_pred_proba,
-            'actual': self.y_test,
-            'metrics': metrics,
-            'task_type': self.task_type,
-            'feature_importance': self._get_feature_importance(),
-            'best_estimator': self.flaml_model.best_estimator,
-            'best_config': self.flaml_model.best_config,
-            'training_history': self._get_training_history(f'{self.output_dir}/flaml.log')
-        }
-        
-        # Save model
-        model_path = os.path.join(self.output_dir, 'best_automl_model.pkl')
-        self._save_model(self.flaml_model, model_path)
-        self.results['model_path'] = model_path
-        print(f"💾 Model berhasil disimpan di: {model_path}")
+        if self.model_list is None:       #testing to only run manual if no model_list
+            # Initialize FLAML AutoML
+            self.flaml_model = FLAMLAutoML(
+                task=self.task_type, 
+                metric=flaml_metric, 
+                seed=self.random_state, 
+                verbose=2,
+            )
+            
+            # Buat direktori output
+            os.makedirs(self.output_dir, exist_ok=True)
+            
+            print(f"⏳ Melatih model (Metrik: {flaml_metric}, Waktu: {time_budget}s)...")
+            
+            # Training model
+            self.flaml_model.fit(
+                X_train=self.X_train, 
+                y_train=self.y_train,
+                log_file_name=f'{self.output_dir}/flaml.log', 
+                time_budget=self.time_budget,
+            )
+            
+            # Prediksi
+            y_pred = self.flaml_model.predict(self.X_test)
+            
+            # Evaluasi berdasarkan task type
+            if self.task_type == "classification":
+                metrics = self._eval_classification(self.y_test, y_pred)
+                y_pred_proba = self.flaml_model.predict_proba(self.X_test) if hasattr(self.flaml_model, 'predict_proba') else None
+            else:
+                metrics = self._eval_regression(self.y_test, y_pred)
+                y_pred_proba = None
+            
+            # Compile results
+            self.results = {
+                'model': self.flaml_model,
+                'predictions': y_pred,
+                'prediction_proba': y_pred_proba,
+                'actual': self.y_test,
+                'metrics': metrics,
+                'task_type': self.task_type,
+                'feature_importance': self._get_feature_importance(),
+                'best_estimator': self.flaml_model.best_estimator,
+                'best_config': self.flaml_model.best_config,
+                'training_history': self._get_training_history(f'{self.output_dir}/flaml.log')
+            }
+            
+            # Save model
+            model_path = os.path.join(self.output_dir, 'best_automl_model.pkl')
+            self._save_model(self.flaml_model, model_path)
+            self.results['model_path'] = model_path
+            print(f"💾 Model berhasil disimpan di: {model_path}")
 
         # Generate visualizations jika explain=True
-        if explain:
+        if self.explain:
             print("📊 Membuat visualisasi...")
             self.results['visualization_paths'] = self._generate_visualizations(self.results, self.output_dir)
             self._generate_model_summary(self.results, self.output_dir)
             print(f"📊 Visualisasi berhasil dibuat dan disimpan di direktori '{self.output_dir}'!")
         
         # Compare dengan model lain jika compare=True
-        if compare:
+        if self.compare:
             print("\n🔍 Memulai perbandingan dengan model lain...")
             comparison_results = self.compare_models(output_dir=self.output_dir, models_to_compare=self.model_list)
             self.results['model_comparison'] = comparison_results
-            
-        print(f"\n🎉 Proses AutoML Selesai!")
-        print(f"🏆 Estimator terbaik: {self.flaml_model.best_estimator}")
-        print(f"📊 Metrics: {metrics}")
+            print(f"\n🎉 Proses AutoML Selesai!")
+        else:
+            print(f"\n🎉 Proses AutoML Selesai!")
+            print(f"🏆 Estimator terbaik: {self.flaml_model.best_estimator}")
+            print(f"📊 Metrics: {metrics}")
         
         return self.results
+
 
     def compare_models(self, models_to_compare: Optional[List[str]] = None, 
                       output_dir: str = "Noventis_results") -> Dict:
         """
         Bandingkan performa AutoML dengan model manual lainnya
         """
-        if models_to_compare is None:
-            if self.task_type == 'classification':
-                models_to_compare = ['logistic_regression', 'random_forest', 'xgboost', 'decision_tree', 'light_gbm', 'catboost', 'gradient_boosting']
-            else:
-                models_to_compare = ['linear_regression', 'random_forest', 'xgboost', 'gradient_boosting', 'lightgbm', 'catboost']
+        # if models_to_compare is None:
+        #     if self.task_type == 'classification':
+        #         models_to_compare = ['logistic_regression', 'random_forest', 'xgboost', 'decision_tree', 'lightgbm', 'catboost', 'gradient_boosting']
+        #     else:
+        #         models_to_compare = ['linear_regression', 'random_forest', 'xgboost', 'gradient_boosting', 'lightgbm', 'catboost']
         
         os.makedirs(output_dir, exist_ok=True)
         all_results = {}
         
-        # Tambahkan hasil AutoML sebagai baseline
-        automl_metrics = self.results['metrics'] if hasattr(self, 'results') else {}
-        all_results['AutoML_FLAML'] = {
-            'metrics': automl_metrics,
-            'model_name': 'AutoML (FLAML)',
-            'best_estimator': getattr(self.flaml_model, 'best_estimator', 'Unknown') if self.flaml_model else 'Unknown'
-        }
+        if models_to_compare is None:       #testing
+            # buat model sendiri untuk compare dan dibandingkan dengan flaml
+            if self.task_type == 'classification':
+                models_to_compare = ['logistic_regression', 'random_forest', 'xgboost', 'decision_tree', 'lightgbm', 'catboost', 'gradient_boosting']
+            else:
+                models_to_compare = ['linear_regression', 'random_forest', 'xgboost', 'gradient_boosting', 'lightgbm', 'catboost']
+
+            # Tambahkan hasil AutoML sebagai baseline
+            automl_metrics = self.results['metrics'] if hasattr(self, 'results') else {}
+            all_results['AutoML_FLAML'] = {
+                'metrics': automl_metrics,
+                'model_name': 'AutoML (FLAML)',
+                'best_estimator': getattr(self.flaml_model, 'best_estimator', 'Unknown') if self.flaml_model else 'Unknown'
+            }
         
         # Test model manual lainnya
         for model_name in models_to_compare:
@@ -241,6 +248,7 @@ class NoventisAutoML:
         ranked_results = self._rank_models(all_results)
         self._visualize_model_comparison(ranked_results, all_results, output_dir)
         self._generate_comparison_report(ranked_results, all_results, output_dir)
+        predictor.save_model(f'{self.output_dir}/best_model.pkl')
         
         print(f"📊 Hasil perbandingan model disimpan di direktori '{output_dir}'.")
         return ranked_results
@@ -535,7 +543,7 @@ class NoventisAutoML:
         
         # Tentukan primary metric untuk ranking
         if self.task_type == "classification":
-            primary_metric = 'macro_f1'     # fix
+            primary_metric = 'f1_score_macro'     #error
         else:
             primary_metric = 'r2_score'
         
@@ -543,7 +551,7 @@ class NoventisAutoML:
             if 'error' in res or 'metrics' not in res:
                 continue
                 
-            score = res['metrics'].get(primary_metric, -1)
+            score = res['metrics'].get(primary_metric, -1)      #ERROR
             model_display_name = name.replace('_', ' ').title()
             
             rankings.append({
@@ -846,4 +854,4 @@ NoventisAutoML(
     status='{status}',
     best_estimator='{best_model}',
     data_shape={getattr(self, 'df', pd.DataFrame()).shape}
-)"""
+"""

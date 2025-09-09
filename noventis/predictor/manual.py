@@ -68,6 +68,25 @@ class ManualPredictor:
             raise ValueError(f"Model '{name}' tidak dikenal untuk tugas {self.task}.")
         return model
 
+    def _get_metrics(self, y_true, y_pred, task):
+        if task=='classification':
+            return {
+                'accuracy': accuracy_score(y_true, y_pred),
+                'f1_score_macro': f1_score(y_true, y_pred, average='macro', zero_division=0),
+                'f1_score_micro': f1_score(y_true, y_pred, average='micro', zero_division=0),
+                'f1_score_weighted': f1_score(y_true, y_pred, average='weighted', zero_division=0),
+                'precision_macro': precision_score(y_true, y_pred, average='macro', zero_division=0),
+                'recall_macro': recall_score(y_true, y_pred, average='macro', zero_division=0)
+            }
+        else:
+            return {
+                'r2_score': r2_score(y_true, y_pred),
+                'mse': mean_squared_error(y_true, y_pred),
+                'rmse': np.sqrt(mean_squared_error(y_true, y_pred)),
+                'mae': mean_absolute_error(y_true, y_pred),
+                'mape': np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+            }
+
     def _run_single_model_pipeline(self, model_name: str, X_train, y_train, X_test, y_test) -> Dict:
         """Menjalankan pipeline untuk satu model."""
         logging.info(f"--- Memproses model: {model_name.upper()} ---")
@@ -80,10 +99,7 @@ class ManualPredictor:
         
         predictions = model.predict(X_test)
         
-        if self.task == 'classification':
-            metrics = {'f1_score': f1_score(y_test, predictions, average='weighted', zero_division=0)}
-        else:
-            metrics = {'r2_score': r2_score(y_test, predictions)}
+        metrics = self._get_metrics(y_test, predictions, self.task)
 
         return {
             'model_name': model_name,
@@ -136,7 +152,7 @@ class ManualPredictor:
                 logging.info(f"Training Ensemble selesai dalam {training_time:.2f} detik.")
                 
                 predictions = ensemble_model.predict(X_test)
-                metrics = {'f1_score': f1_score(y_test, predictions, average='weighted', zero_division=0)} if self.task == 'classification' else {'r2_score': r2_score(y_test, predictions)}
+                metrics = self._get_metrics(y_test, predictions, self.task)
 
                 all_results.append({
                     'model_name': 'ensemble', 'model_object': ensemble_model,
@@ -145,7 +161,7 @@ class ManualPredictor:
             except Exception as e:
                 logging.error(f"Gagal melatih model ensemble: {e}")
 
-            primary_metric = 'f1_score' if self.task == 'classification' else 'r2_score'
+            primary_metric = 'f1_weighted_score' if self.task == 'classification' else 'r2_score'
             self.best_model_info = max(all_results, key=lambda x: x['metrics'][primary_metric])
             
             logging.info(f"\n--- Perbandingan Selesai ---")
