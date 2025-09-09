@@ -24,11 +24,31 @@ class NoventisAutoML:
     penyimpanan model, visualisasi, dan perbandingan dengan model manual.
     """
 
-    def __init__(self, data: Union[str, pd.DataFrame], target: str, task: Optional[str] = None, test_size: float = 0.2, random_state: int = 42):
+    def __init__(
+        self, 
+        data: Union[str, pd.DataFrame], 
+        target: str, 
+        task: Optional[str] = None, 
+        models: List[str]=None,
+        explain: bool=True,
+        compare: bool=False,
+        metrics: str=None,
+        time_budget: int=60,
+        output_dir: str='Noventis_Results',
+        test_size: float = 0.2, 
+        random_state: int = 42,
+    ):
         self.target_column = target
         self.task_type = task.lower() if task else None
         self.test_size = test_size
         self.random_state = random_state
+        self.explain=explain
+        self.compare=compare
+        self.metrics=metrics
+        self.time_budget=time_budget
+        self.output_dir=output_dir
+        self.model_list=models
+
         self.flaml_model = None
         self.results = {}
         self._load_data(data)
@@ -85,7 +105,7 @@ class NoventisAutoML:
         print(f"📈 Target distribution: {dict(y.value_counts()) if self.task_type == 'classification' else f'Range: {y.min():.2f} - {y.max():.2f}'}")
 
     def fit(self, time_budget: int = 60, metric: Optional[str] = None, explain: bool = True, 
-            compare: bool = False, output_dir: str = "noventis_output", **kwargs) -> Dict:
+            compare: bool = False, **kwargs) -> Dict:
         """
         Melatih model AutoML dengan FLAML
         
@@ -99,25 +119,30 @@ class NoventisAutoML:
         print("🚀 Memulai proses AutoML dengan FLAML...")
         
         # Convert metric untuk FLAML
-        flaml_metric = self._convert_metric_to_flaml(metric)
+        flaml_metric = self._convert_metric_to_flaml(self.metrics)
         
         # Initialize FLAML AutoML
         self.flaml_model = FLAMLAutoML(
             task=self.task_type, 
             metric=flaml_metric, 
-            time_budget=time_budget,
             seed=self.random_state, 
-            log_file_name=f'{output_dir}/flaml.log', 
+            verbose=2,
             **kwargs
         )
         
         # Buat direktori output
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(self.output_dir, exist_ok=True)
         
         print(f"⏳ Melatih model (Metrik: {flaml_metric}, Waktu: {time_budget}s)...")
         
         # Training model
-        self.flaml_model.fit(X_train=self.X_train, y_train=self.y_train)
+        self.flaml_model.fit(
+            X_train=self.X_train, 
+            y_train=self.y_train,
+            estimator_list=self.model_list,
+            log_file_name=f'{self.output_dir}/flaml.log', 
+            time_budget=self.time_budget,
+        )
         
         # Prediksi
         y_pred = self.flaml_model.predict(self.X_test)
@@ -141,11 +166,11 @@ class NoventisAutoML:
             'feature_importance': self._get_feature_importance(),
             'best_estimator': self.flaml_model.best_estimator,
             'best_config': self.flaml_model.best_config,
-            'training_history': self._get_training_history(f'{output_dir}/flaml.log')
+            'training_history': self._get_training_history(f'{self.output_dir}/flaml.log')
         }
         
         # Save model
-        model_path = os.path.join(output_dir, 'best_automl_model.pkl')
+        model_path = os.path.join(self.output_dir, 'best_automl_model.pkl')
         self._save_model(self.flaml_model, model_path)
         self.results['model_path'] = model_path
         print(f"💾 Model berhasil disimpan di: {model_path}")
@@ -153,14 +178,14 @@ class NoventisAutoML:
         # Generate visualizations jika explain=True
         if explain:
             print("📊 Membuat visualisasi...")
-            self.results['visualization_paths'] = self._generate_visualizations(self.results, output_dir)
-            self._generate_model_summary(self.results, output_dir)
-            print(f"📊 Visualisasi berhasil dibuat dan disimpan di direktori '{output_dir}'!")
+            self.results['visualization_paths'] = self._generate_visualizations(self.results, self.output_dir)
+            self._generate_model_summary(self.results, self.output_dir)
+            print(f"📊 Visualisasi berhasil dibuat dan disimpan di direktori '{self.output_dir}'!")
         
         # Compare dengan model lain jika compare=True
         if compare:
             print("\n🔍 Memulai perbandingan dengan model lain...")
-            comparison_results = self.compare_models(output_dir=output_dir, **kwargs)
+            comparison_results = self.compare_models(output_dir=self.output_dir, models_to_compare=self.model_list)
             self.results['model_comparison'] = comparison_results
             
         print(f"\n🎉 Proses AutoML Selesai!")
@@ -170,15 +195,15 @@ class NoventisAutoML:
         return self.results
 
     def compare_models(self, models_to_compare: Optional[List[str]] = None, 
-                      output_dir: str = "noventis_output", **kwargs) -> Dict:
+                      output_dir: str = "Noventis_results") -> Dict:
         """
         Bandingkan performa AutoML dengan model manual lainnya
         """
         if models_to_compare is None:
             if self.task_type == 'classification':
-                models_to_compare = ['logistic_regression', 'random_forest', 'xgboost', 'svm']
+                models_to_compare = ['logistic_regression', 'random_forest', 'xgboost', 'decision_tree', 'light_gbm', 'catboost', 'gradient_boosting']
             else:
-                models_to_compare = ['linear_regression', 'random_forest', 'xgboost', 'svr']
+                models_to_compare = ['linear_regression', 'random_forest', 'xgboost', 'gradient_boosting', 'lightgbm', 'catboost']
         
         os.makedirs(output_dir, exist_ok=True)
         all_results = {}
@@ -244,7 +269,8 @@ class NoventisAutoML:
     def _convert_metric_to_flaml(self, metric: Optional[str]) -> str:
         """Convert metric name untuk FLAML"""
         if metric is None:
-            return "roc_auc" if self.task_type == "classification" else "r2"
+            return "macro_f1" if self.task_type == "classification" else "r2"
+            # return 'auto'
         return metric
 
     def _get_feature_importance(self) -> Optional[pd.DataFrame]:
@@ -509,7 +535,7 @@ class NoventisAutoML:
         
         # Tentukan primary metric untuk ranking
         if self.task_type == "classification":
-            primary_metric = 'f1_score_macro'
+            primary_metric = 'macro_f1'     # fix
         else:
             primary_metric = 'r2_score'
         
