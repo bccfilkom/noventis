@@ -22,7 +22,6 @@ def plot_to_base64(fig):
     plt.close(fig)
     return f"data:image/png;base64,{img_str}"
 
-# Set default matplotlib parameters
 plt.rcParams.update({
     'font.size': 12, 'axes.labelsize': 10, 'xtick.labelsize': 8, 'ytick.labelsize': 8,
     'axes.titlesize': 12, 'figure.titlesize': 14, 'legend.fontsize': 10,
@@ -54,7 +53,6 @@ class EDAAnalyzer:
         
         self.CORRELATION_COL_THRESHOLD = 30
 
-    # --- Metode Analisis (tidak ada perubahan di dalamnya) ---
     def _generate_overview(self) -> str:
         overview_html = f"""<div class="grid-container"><div class="grid-item"><h4>Dataset Shape</h4><p><b>Rows:</b> {self.df.shape[0]}</p><p><b>Columns:</b> {self.df.shape[1]}</p></div><div class="grid-item"><h4>Column Types</h4><p><b>Numeric:</b> {len(self.numeric_cols_)}</p><p><b>Categorical:</b> {len(self.categorical_cols_)}</p></div><div class="grid-item"><h4>Memory Usage</h4><p>{(self.df.memory_usage(deep=True).sum() / 1024**2):.2f} MB</p></div></div><h3>Data Preview (First 10 Rows)</h3><div class='table-scroll-wrapper'>{self.df.head(10).to_html(classes='styled-table')}</div>"""
         return overview_html
@@ -164,7 +162,6 @@ class EDAAnalyzer:
         missing_values_html = f"<h3>Summary</h3>{missing_summary_html}<h3>Pattern</h3><div class='plot-container'><img src='{missing_plot_b64}'></div>" if missing_plot_b64 else missing_summary_html
         correlation_html = f"{correlation_main_content_html}<h3>Top Positive Correlations (> 0.7)</h3>{pos_corr_html}<h3>Top Negative Correlations (< -0.7)</h3>{neg_corr_html}"
         
-        # --- PERUBAHAN UTAMA ADA DI SINI ---
         html_template = f"""
         <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Noventis Automated EDA Report</title>
         <style>
@@ -263,8 +260,6 @@ class EDAAnalyzer:
         """
         print("Generating EDA report, please wait...")
         
-        # Kembali ke metode awal: generate HTML dan langsung display
-        # Parameter report_height sekarang dilewatkan ke generate_html_report
         report_html = self.generate_html_report(report_height=report_height)
         
         print("Report generated successfully. Displaying below.")
