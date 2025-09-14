@@ -1,0 +1,90 @@
+======================================================================
+         NOVENTIS AutoML - MODEL COMPARISON REPORT
+======================================================================
+
+Task Type: Classification
+Primary Metric: f1_score_macro
+Best Model: Xgboost
+
+MODEL RANKINGS:
+--------------------------------------------------
+1. Xgboost
+   Primary Score: 0.8030
+   All Metrics:
+     Accuracy: 0.8053
+     F1 Score Macro: 0.8030
+     F1 Score Micro: 0.8053
+     F1 Score Weighted: 0.8009
+     Precision Macro: 0.8173
+     Recall Macro: 0.7930
+
+2. Lightgbm
+   Primary Score: 0.7975
+   All Metrics:
+     Accuracy: 0.8012
+     F1 Score Macro: 0.7975
+     F1 Score Micro: 0.8012
+     F1 Score Weighted: 0.7970
+     Precision Macro: 0.8139
+     Recall Macro: 0.7852
+
+3. Catboost
+   Primary Score: 0.7940
+   All Metrics:
+     Accuracy: 0.7982
+     F1 Score Macro: 0.7940
+     F1 Score Micro: 0.7982
+     F1 Score Weighted: 0.7928
+     Precision Macro: 0.8110
+     Recall Macro: 0.7831
+
+4. Automl Flaml
+   Primary Score: 0.7830
+   All Metrics:
+     Accuracy: 0.7906
+     F1 Score Macro: 0.7830
+     F1 Score Micro: 0.7906
+     F1 Score Weighted: 0.7832
+     Precision Macro: 0.8037
+     Recall Macro: 0.7722
+
+5. Random Forest
+   Primary Score: 0.7765
+   All Metrics:
+     Accuracy: 0.7819
+     F1 Score Macro: 0.7765
+     F1 Score Micro: 0.7819
+     F1 Score Weighted: 0.7750
+     Precision Macro: 0.7915
+     Recall Macro: 0.7682
+
+6. Gradient Boosting
+   Primary Score: 0.7546
+   All Metrics:
+     Accuracy: 0.7619
+     F1 Score Macro: 0.7546
+     F1 Score Micro: 0.7619
+     F1 Score Weighted: 0.7482
+     Precision Macro: 0.7867
+     Recall Macro: 0.7465
+
+7. Decision Tree
+   Primary Score: 0.7078
+   All Metrics:
+     Accuracy: 0.7002
+     F1 Score Macro: 0.7078
+     F1 Score Micro: 0.7002
+     F1 Score Weighted: 0.7006
+     Precision Macro: 0.7050
+     Recall Macro: 0.7107
+
+8. Logistic Regression
+   Primary Score: 0.1792
+   All Metrics:
+     Accuracy: 0.4435
+     F1 Score Macro: 0.1792
+     F1 Score Micro: 0.4435
+     F1 Score Weighted: 0.3167
+     Precision Macro: 0.1783
+     Recall Macro: 0.2372
+
