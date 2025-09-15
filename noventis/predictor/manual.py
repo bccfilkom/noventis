@@ -101,10 +101,18 @@ class ManualPredictor:
         
         predictions = model.predict(X_test)
         metrics = self._calculate_all_metrics(y_test, predictions)
+
+        if self.task == 'classification':
+            y_pred_proba = model.predict_proba(X_test)
+        else:
+            y_pred_proba = None
         
         return {
             'model_name': model_name,
             'model_object': model,
+            'predictions' : predictions,
+            'prediction_proba' : y_pred_proba,
+            'actual' : y_test,
             'metrics': metrics,
             'training_time_seconds': training_time
         }
@@ -250,10 +258,13 @@ class ManualPredictor:
                 
                 predictions = ensemble_model.predict(X_test)
                 metrics = self._calculate_all_metrics(y_test, predictions)
+                prediction_proba = predictions.predict_proba(X_test)
 
                 self.all_results.append({
                     'model_name': 'ensemble', 'model_object': ensemble_model,
-                    'metrics': metrics, 'training_time_seconds': training_time
+                    'predictions': predictions, 'prediction_proba': prediction_proba,
+                    'actual': y_test,
+                    'metrics': metrics, 'training_time_seconds': training_time,
                 })
             except Exception as e:
                 logging.error(f"Failed to train ensemble model: {e}")

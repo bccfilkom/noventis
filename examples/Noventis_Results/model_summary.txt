@@ -2,18 +2,13 @@
          NOVENTIS AutoML - MODEL SUMMARY
 ============================================================
 
-Task Type: Classification
-Best Estimator: catboost
-Best Configuration: {'early_stopping_rounds': 10, 'learning_rate': 0.06233639237958607, 'n_estimators': 8192}
-
+Task Type: classification
 PERFORMANCE METRICS:
 ------------------------------
 Accuracy: 0.7906
-F1 Score Macro: 0.7830
-F1 Score Micro: 0.7906
-F1 Score Weighted: 0.7832
-Precision Macro: 0.8037
-Recall Macro: 0.7722
+Precision: 0.7865
+Recall: 0.7906
+F1 Score: 0.7832
 
 TOP 10 IMPORTANT FEATURES:
 ------------------------------

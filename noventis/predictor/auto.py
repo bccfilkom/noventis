@@ -31,7 +31,7 @@ class NoventisAutoML:
         task: Optional[str] = None, 
         models: List[str]=None,
         explain: bool=True,
-        compare: bool=False,
+        compare: bool=True,
         metrics: str=None,
         time_budget: int=60,
         output_dir: str='Noventis_Results',
@@ -48,8 +48,10 @@ class NoventisAutoML:
         self.time_budget=time_budget
         self.output_dir=output_dir
         self.model_list=models
+        self.use_automl = True if (compare or self.model_list is not None) else False 
 
         self.flaml_model = None
+        self.manual_model = None
         self.results = {}
         self._load_data(data)
         self._setup_data()
@@ -68,7 +70,7 @@ class NoventisAutoML:
         print(f"📊 Shape data: {self.df.shape}")
         print(f"📋 Kolom: {list(self.df.columns)}")
 
-    def _detect_task_type(self) -> str:
+    def _detect_task_type(self) -> str: #bnr
         """Deteksi otomatis tipe tugas berdasarkan target variable"""
         y = self.df[self.target_column]
         unique_values = len(y.unique())
@@ -82,7 +84,7 @@ class NoventisAutoML:
         else:
             return "classification"
 
-    def _setup_data(self):
+    def _setup_data(self):  # bnr
         """Setup dan split data untuk training dan testing"""
         if self.target_column not in self.df.columns:
             raise ValueError(f"Kolom target '{self.target_column}' tidak ditemukan.")
@@ -118,19 +120,18 @@ class NoventisAutoML:
         print("🚀 Memulai proses AutoML dengan FLAML...")
         
         # Convert metric untuk FLAML
-        flaml_metric = self._convert_metric_to_flaml(self.metrics)
-        
-        if self.model_list is None:       #testing to only run manual if no model_list
+        flaml_metric = self._convert_metric_to_flaml(self.metrics)  #bnr
+
+        # Buat direktori output
+        os.makedirs(self.output_dir, exist_ok=True)
+        if self.use_automl:      
             # Initialize FLAML AutoML
-            self.flaml_model = FLAMLAutoML(
+            self.flaml_model = FLAMLAutoML( #bnr
                 task=self.task_type, 
                 metric=flaml_metric, 
                 seed=self.random_state, 
                 verbose=2,
             )
-            
-            # Buat direktori output
-            os.makedirs(self.output_dir, exist_ok=True)
             
             print(f"⏳ Melatih model (Metrik: {flaml_metric}, Waktu: {time_budget}s)...")
             
@@ -154,7 +155,7 @@ class NoventisAutoML:
                 y_pred_proba = None
             
             # Compile results
-            self.results = {
+            self.results['AutoML'] = {    # fix : ga perlu config, training history?
                 'model': self.flaml_model,
                 'predictions': y_pred,
                 'prediction_proba': y_pred_proba,
@@ -172,14 +173,40 @@ class NoventisAutoML:
             self._save_model(self.flaml_model, model_path)
             self.results['model_path'] = model_path
             print(f"💾 Model berhasil disimpan di: {model_path}")
-
-        # Generate visualizations jika explain=True
-        if self.explain:
-            print("📊 Membuat visualisasi...")
-            self.results['visualization_paths'] = self._generate_visualizations(self.results, self.output_dir)
-            self._generate_model_summary(self.results, self.output_dir)
-            print(f"📊 Visualisasi berhasil dibuat dan disimpan di direktori '{self.output_dir}'!")
         
+        else:
+            predictor = ManualPredictor(
+                model_name=self.model_list, 
+                task=self.task_type, 
+                random_state=self.random_state
+            )
+            result = predictor.run_pipeline(
+                self.df, 
+                target_column=self.target_column, 
+                test_size=self.test_size
+            )
+            self.manual_model = predictor
+
+            all_model_results = result['all_model_results']
+            for model_result in all_model_results:
+                model_name = model_result['model_name']
+                metrics = model_result['metrics']
+                y_pred = model_result['predictions']
+                y_pred_proba = model_result['prediction_proba']
+                
+                self.results[model_name] = {    # masih harus di tambahin untuk yang None
+                    'model': model_name,
+                    'predictions': y_pred,
+                    'prediction_proba': y_pred_proba,
+                    'actual': self.y_test,
+                    'metrics': metrics,
+                    'task_type': self.task_type,
+                    'feature_importance': None,
+                    'best_estimator': None,
+                    'best_config': None,
+                    'training_history': None
+                }
+
         # Compare dengan model lain jika compare=True
         if self.compare:
             print("\n🔍 Memulai perbandingan dengan model lain...")
@@ -190,6 +217,13 @@ class NoventisAutoML:
             print(f"\n🎉 Proses AutoML Selesai!")
             print(f"🏆 Estimator terbaik: {self.flaml_model.best_estimator}")
             print(f"📊 Metrics: {metrics}")
+
+        # Generate visualizations jika explain=True
+        if self.explain:
+            print("📊 Membuat visualisasi...")
+            self.results['visualization_paths'] = self._generate_visualizations(self.results, self.output_dir)
+            self._generate_model_summary(self.results, self.output_dir)
+            print(f"📊 Visualisasi berhasil dibuat dan disimpan di direktori '{self.output_dir}'!")
         
         return self.results
 
@@ -216,39 +250,57 @@ class NoventisAutoML:
                 models_to_compare = ['linear_regression', 'random_forest', 'xgboost', 'gradient_boosting', 'lightgbm', 'catboost']
 
             # Tambahkan hasil AutoML sebagai baseline
-            automl_metrics = self.results['metrics'] if hasattr(self, 'results') else {}
-            all_results['AutoML_FLAML'] = {
+            automl_metrics = self.results['AutoML']['metrics'] if hasattr(self, 'results') else {}
+            all_results['AutoML'] = {
                 'metrics': automl_metrics,
-                'model_name': 'AutoML (FLAML)',
+                'model_name': 'AutoML',
                 'best_estimator': getattr(self.flaml_model, 'best_estimator', 'Unknown') if self.flaml_model else 'Unknown'
             }
         
-        # Test model manual lainnya
-        for model_name in models_to_compare:
-            print(f"\n{'='*20} Melatih {model_name.replace('_', ' ').title()} {'='*20}")
-            try:
-                predictor = ManualPredictor(
-                    model_name=model_name, 
-                    task=self.task_type, 
-                    random_state=self.random_state
-                )
-                result = predictor.run_pipeline(
-                    self.df, 
-                    target_column=self.target_column, 
-                    test_size=self.test_size
-                )
-                all_results[model_name] = result
-                print(f"✅ {model_name} berhasil dilatih")
+        if self.manual_model is None:
+            predictor = ManualPredictor(
+                model_name=self.model_list, 
+                task=self.task_type, 
+                random_state=self.random_state
+            )
+            result = predictor.run_pipeline(
+                self.df, 
+                target_column=self.target_column, 
+                test_size=self.test_size
+            )
+            self.manual_model = predictor
+
+            all_model_results = result['all_model_results']
+            for model_result in all_model_results:
+                model_name = model_result['model_name']
+                metrics = model_result['metrics']
+                y_pred = model_result['predictions']
+                y_pred_proba = model_result['prediction_proba']
                 
-            except Exception as e:
-                print(f"❌ Error saat melatih {model_name}: {e}")
-                all_results[model_name] = {'error': str(e)}
+                self.results[model_name] = {    # masih harus di tambahin untuk yang None
+                    'model': model_name,
+                    'predictions': y_pred,
+                    'prediction_proba': y_pred_proba,
+                    'actual': self.y_test,
+                    'metrics': metrics,
+                    'task_type': self.task_type,
+                    'feature_importance': None,
+                    'best_estimator': None,
+                    'best_config': None,
+                    'training_history': None
+                }
+
+        # Test model manual lainnya
+        for model in self.results:
+            if model == 'AutoML':
+                continue
+            all_results[model] = self.results[model]
         
         # Ranking dan visualisasi
         ranked_results = self._rank_models(all_results)
         self._visualize_model_comparison(ranked_results, all_results, output_dir)
         self._generate_comparison_report(ranked_results, all_results, output_dir)
-        predictor.save_model(f'{self.output_dir}/best_model.pkl')
+        predictor.save_model(f'{self.output_dir}/best_model_without_automl.pkl')
         
         print(f"📊 Hasil perbandingan model disimpan di direktori '{output_dir}'.")
         return ranked_results
@@ -257,57 +309,62 @@ class NoventisAutoML:
         """Evaluasi lengkap untuk classification"""
         return {
             'accuracy': accuracy_score(y_true, y_pred),
-            'f1_score_macro': f1_score(y_true, y_pred, average='macro', zero_division=0),
-            'f1_score_micro': f1_score(y_true, y_pred, average='micro', zero_division=0),
-            'f1_score_weighted': f1_score(y_true, y_pred, average='weighted', zero_division=0),
-            'precision_macro': precision_score(y_true, y_pred, average='macro', zero_division=0),
-            'recall_macro': recall_score(y_true, y_pred, average='macro', zero_division=0)
+            'precision': precision_score(y_true, y_pred, average='weighted', zero_division=0),
+            'recall': recall_score(y_true, y_pred, average='weighted', zero_division=0),
+            'f1_score': f1_score(y_true, y_pred, average='weighted', zero_division=0)
         }
 
     def _eval_regression(self, y_true, y_pred) -> Dict:
         """Evaluasi lengkap untuk regression"""
+        mse = mean_squared_error(y_true, y_pred)
         return {
-            'r2_score': r2_score(y_true, y_pred),
-            'mse': mean_squared_error(y_true, y_pred),
-            'rmse': np.sqrt(mean_squared_error(y_true, y_pred)),
-            'mae': mean_absolute_error(y_true, y_pred),
-            'mape': np.mean(np.abs((y_true - y_pred) / y_true)) * 100
-        }
+                'mae': mean_absolute_error(y_true, y_pred),
+                'mse': mse,
+                'rmse': np.sqrt(mse),
+                'r2_score': r2_score(y_true, y_pred)
+            }
 
     def _convert_metric_to_flaml(self, metric: Optional[str]) -> str:
         """Convert metric name untuk FLAML"""
         if metric is None:
             return "macro_f1" if self.task_type == "classification" else "r2"
             # return 'auto'
+        elif metric == 'f1_score':
+            return 'f1'
+        elif metric == 'r2_score':
+            return 'r2'
         return metric
 
     def _get_feature_importance(self) -> Optional[pd.DataFrame]:
         """Ekstrak feature importance jika tersedia"""
-        try:
-            if hasattr(self.flaml_model, 'feature_importances_'):
-                return pd.DataFrame({
-                    'feature': self.X_train.columns, 
-                    'importance': self.flaml_model.feature_importances_
-                }).sort_values('importance', ascending=False)
-            else:
+        if self.use_automl:
+            try:
+                if hasattr(self.flaml_model, 'feature_importances_'):
+                    return pd.DataFrame({
+                        'feature': self.X_train.columns, 
+                        'importance': self.flaml_model.feature_importances_
+                    }).sort_values('importance', ascending=False)
+                else:
+                    return None
+            except Exception as e:
+                print(f"⚠️ Tidak dapat mengekstrak feature importance: {e}")
                 return None
-        except Exception as e:
-            print(f"⚠️ Tidak dapat mengekstrak feature importance: {e}")
-            return None
+            
 
     def _get_training_history(self, log_file) -> Optional[pd.DataFrame]:
         """Ekstrak training history dari log file FLAML"""
-        try:
-            if os.path.exists(log_file):
-                time_h, loss_h, _, _, _ = get_output_from_log(filename=log_file, time_budget=float('inf'))
-                return pd.DataFrame({
-                    'time_seconds': time_h, 
-                    'best_validation_loss': loss_h
-                })
-            return None
-        except Exception as e:
-            print(f"⚠️ Tidak dapat membaca training history: {e}")
-            return None
+        if self.use_automl:
+            try:
+                if os.path.exists(log_file):
+                    time_h, loss_h, _, _, _ = get_output_from_log(filename=log_file, time_budget=float('inf'))
+                    return pd.DataFrame({
+                        'time_seconds': time_h, 
+                        'best_validation_loss': loss_h
+                    })
+                return None
+            except Exception as e:
+                print(f"⚠️ Tidak dapat membaca training history: {e}")
+                return None
 
     def _save_model(self, model, path):
         """Save model ke file pickle"""
@@ -323,39 +380,40 @@ class NoventisAutoML:
         plt.style.use('default')  # Use default style for better compatibility
         
         try:
-            # 1. Feature Importance
-            if results['feature_importance'] is not None and not results['feature_importance'].empty:
-                plt.figure(figsize=(12, max(6, len(results['feature_importance']) * 0.4)))
-                top_features = results['feature_importance'].head(20)  # Top 20 features
-                
-                sns.barplot(x='importance', y='feature', data=top_features, palette='viridis')
-                plt.title('Top 20 Feature Importance', fontsize=16, fontweight='bold')
-                plt.xlabel('Importance Score', fontsize=12)
-                plt.ylabel('Features', fontsize=12)
-                plt.tight_layout()
-                
-                path = os.path.join(output_dir, 'feature_importance.png')
-                plt.savefig(path, dpi=300, bbox_inches='tight')
-                paths.append(path)
-                plt.close()
+            if self.use_automl:
+                # 1. Feature Importance
+                if results['feature_importance'] is not None and not results['feature_importance'].empty:
+                    plt.figure(figsize=(12, max(6, len(results['feature_importance']) * 0.4)))
+                    top_features = results['feature_importance'].head(20)  # Top 20 features
+                    
+                    sns.barplot(x='importance', y='feature', data=top_features, palette='viridis')
+                    plt.title('Top 20 Feature Importance', fontsize=16, fontweight='bold')
+                    plt.xlabel('Importance Score', fontsize=12)
+                    plt.ylabel('Features', fontsize=12)
+                    plt.tight_layout()
+                    
+                    path = os.path.join(output_dir, 'feature_importance.png')
+                    plt.savefig(path, dpi=300, bbox_inches='tight')
+                    paths.append(path)
+                    plt.close()
 
-            # 2. Training History
-            if results['training_history'] is not None and not results['training_history'].empty:
-                plt.figure(figsize=(12, 6))
-                history = results['training_history']
-                
-                plt.plot(history['time_seconds'], history['best_validation_loss'], 
-                        marker='o', linestyle='-', color='b', linewidth=2, markersize=4)
-                plt.title('AutoML Training Progress', fontsize=16, fontweight='bold')
-                plt.xlabel('Time (seconds)', fontsize=12)
-                plt.ylabel('Best Validation Loss', fontsize=12)
-                plt.grid(True, alpha=0.3)
-                plt.tight_layout()
-                
-                path = os.path.join(output_dir, 'training_history.png')
-                plt.savefig(path, dpi=300, bbox_inches='tight')
-                paths.append(path)
-                plt.close()
+                # 2. Training History
+                if results['training_history'] is not None and not results['training_history'].empty:
+                    plt.figure(figsize=(12, 6))
+                    history = results['training_history']
+                    
+                    plt.plot(history['time_seconds'], history['best_validation_loss'], 
+                            marker='o', linestyle='-', color='b', linewidth=2, markersize=4)
+                    plt.title('AutoML Training Progress', fontsize=16, fontweight='bold')
+                    plt.xlabel('Time (seconds)', fontsize=12)
+                    plt.ylabel('Best Validation Loss', fontsize=12)
+                    plt.grid(True, alpha=0.3)
+                    plt.tight_layout()
+                    
+                    path = os.path.join(output_dir, 'training_history.png')
+                    plt.savefig(path, dpi=300, bbox_inches='tight')
+                    paths.append(path)
+                    plt.close()
 
             # 3. Task-specific visualizations
             if results['task_type'] == 'classification':
@@ -515,22 +573,23 @@ class NoventisAutoML:
                 f.write("         NOVENTIS AutoML - MODEL SUMMARY\n")
                 f.write("="*60 + "\n\n")
                 
-                f.write(f"Task Type: {results['task_type'].title()}\n")
-                f.write(f"Best Estimator: {results['best_estimator']}\n")
-                f.write(f"Best Configuration: {results['best_config']}\n\n")
+                f.write(f"Task Type: {self.task_type}\n")
+                # f.write(f"Best Estimator: {results['best_estimator']}\n")
+                # f.write(f"Best Configuration: {results['best_config']}\n\n")
                 
                 f.write("PERFORMANCE METRICS:\n")
                 f.write("-" * 30 + "\n")
-                for metric, value in results['metrics'].items():
-                    f.write(f"{metric.replace('_', ' ').title()}: {value:.4f}\n")
+                for model_name in results:
+                    for metric, value in results[model_name]['metrics'].items():
+                        f.write(f"{metric.replace('_', ' ').title()}: {value:.4f}\n")
+                    
+                    if results[model_name]['feature_importance'] is not None:
+                        f.write(f"\nTOP 10 IMPORTANT FEATURES:\n")
+                        f.write("-" * 30 + "\n")
+                        for idx, row in results[model_name]['feature_importance'].head(10).iterrows():
+                            f.write(f"{row['feature']}: {row['importance']:.4f}\n")
                 
-                if results['feature_importance'] is not None:
-                    f.write(f"\nTOP 10 IMPORTANT FEATURES:\n")
-                    f.write("-" * 30 + "\n")
-                    for idx, row in results['feature_importance'].head(10).iterrows():
-                        f.write(f"{row['feature']}: {row['importance']:.4f}\n")
-                
-                f.write(f"\nModel saved at: {results['model_path']}\n")
+                    f.write(f"\nModel saved at: {results['model_path']}\n")
                 
             print(f"📄 Summary report disimpan di: {summary_path}")
             
@@ -543,15 +602,15 @@ class NoventisAutoML:
         
         # Tentukan primary metric untuk ranking
         if self.task_type == "classification":
-            primary_metric = 'f1_score_macro'     #error
+            primary_metric = 'f1_score' if self.metrics is None else self.metrics   
         else:
-            primary_metric = 'r2_score'
+            primary_metric = 'r2_score' if self.metrics is None else self.metrics
         
         for name, res in results.items():
             if 'error' in res or 'metrics' not in res:
                 continue
                 
-            score = res['metrics'].get(primary_metric, -1)      #ERROR
+            score = res['metrics'].get(primary_metric, -1)      
             model_display_name = name.replace('_', ' ').title()
             
             rankings.append({
@@ -855,3 +914,4 @@ NoventisAutoML(
     best_estimator='{best_model}',
     data_shape={getattr(self, 'df', pd.DataFrame()).shape}
 """
+    
