@@ -1,0 +1,26 @@
+============================================================
+         NOVENTIS AutoML - MODEL SUMMARY
+============================================================
+
+Task Type: classification
+PERFORMANCE METRICS:
+------------------------------
+Accuracy: 0.7906
+Precision: 0.7865
+Recall: 0.7906
+F1 Score: 0.7832
+
+TOP 10 IMPORTANT FEATURES:
+------------------------------
+table: 31.8820
+depth: 31.5165
+y: 9.5089
+x: 9.0294
+price: 5.0568
+clarity: 4.0374
+color: 3.0190
+Unnamed_0: 2.5606
+z: 2.0555
+carat: 1.3339
+
+Model saved at: Noventis_Results\best_automl_model.pkl
