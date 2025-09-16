@@ -5,8 +5,15 @@ import pickle
 from typing import Union, Optional, Dict, Any, List
 import warnings
 
-# Import library FLAML untuk AutoML, scikit-learn untuk evaluasi & split data, serta visualisasi
-from flaml import AutoML as FLAMLAutoML
+try:
+    from flaml import AutoML as FLAMLAutoML
+except ImportError:
+    try:
+        from flaml.automl import AutoML as FLAMLAutoML
+    except ImportError:
+        from flaml.automl.automl import AutoML as FLAMLAutoML
+
+
 from flaml.automl.data import get_output_from_log
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, r2_score, confusion_matrix, ConfusionMatrixDisplay, accuracy_score, precision_score, recall_score, mean_squared_error, mean_absolute_error
