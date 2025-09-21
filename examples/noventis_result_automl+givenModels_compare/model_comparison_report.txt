@@ -4,31 +4,39 @@
 
 Task Type: Classification
 Primary Metric: f1_score
-Best Model: Xgboost
+Best Model: xgboost
 
 MODEL RANKINGS:
 --------------------------------------------------
-1. Xgboost
-   Primary Score: 0.8009
+1. xgboost
+   Primary Score: 0.8030
    All Metrics:
      Accuracy: 0.8053
      Precision: 0.8014
      Recall: 0.8053
-     F1 Score: 0.8009
+     F1 Score: 0.8030
 
-2. Lightgbm
-   Primary Score: 0.7970
+2. AutoML
+   Primary Score: 0.7978
+   All Metrics:
+     Accuracy: 0.7996
+     Precision: 0.7953
+     Recall: 0.7996
+     F1 Score: 0.7978
+
+3. lightgbm
+   Primary Score: 0.7975
    All Metrics:
      Accuracy: 0.8012
      Precision: 0.7975
      Recall: 0.8012
-     F1 Score: 0.7970
+     F1 Score: 0.7975
 
-3. Decision Tree
-   Primary Score: 0.7006
+4. decision tree
+   Primary Score: 0.7078
    All Metrics:
      Accuracy: 0.7002
      Precision: 0.7011
      Recall: 0.7002
-     F1 Score: 0.7006
+     F1 Score: 0.7078
 

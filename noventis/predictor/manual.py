@@ -248,7 +248,7 @@ class ManualPredictor:
                 'accuracy': accuracy_score(y_true, y_pred),
                 'precision': precision_score(y_true, y_pred, average='weighted', zero_division=0),
                 'recall': recall_score(y_true, y_pred, average='weighted', zero_division=0),
-                'f1_score': f1_score(y_true, y_pred, average='weighted', zero_division=0)
+                'f1_score': f1_score(y_true, y_pred, average='macro', zero_division=0)
             }
         else:
             mse = mean_squared_error(y_true, y_pred)
