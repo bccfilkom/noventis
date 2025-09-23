@@ -189,6 +189,9 @@ class NoventisAutoML:
 
             all_model_results = result['all_model_results']
             for model_result in all_model_results:
+                if 'error' in model_result:
+                    print(f"⚠️  Peringatan: Melewati model '{model_result.get('model_name', 'Unknown')}' karena gagal saat training.")
+                    continue
                 model_name = model_result['model_name']
                 metrics = model_result['metrics']
                 y_pred = model_result['predictions']
@@ -296,8 +299,8 @@ class NoventisAutoML:
             }
         
         if self.manual_model is None:
-            predictor = ManualPredictor(
-                model_name=self.model_list, 
+            predictor = ManualPredictor(ss
+                model_name=models_to_compare, 
                 task=self.task_type, 
                 random_state=self.random_state
             )
@@ -310,6 +313,9 @@ class NoventisAutoML:
 
             all_model_results = result['all_model_results']
             for model_result in all_model_results:
+                if 'error' in model_result:
+                    print(f"⚠️  Peringatan: Melewati model '{model_result.get('model_name', 'Unknown')}' karena gagal saat training.")
+                    continue
                 model_name = model_result['model_name']
                 metrics = model_result['metrics']
                 y_pred = model_result['predictions']

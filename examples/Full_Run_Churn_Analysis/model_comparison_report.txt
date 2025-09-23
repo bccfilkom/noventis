@@ -1,0 +1,19 @@
+======================================================================
+         NOVENTIS AutoML - MODEL COMPARISON REPORT
+======================================================================
+
+Task Type: Classification
+Primary Metric: accuracy
+Best Model: Xgboost
+
+MODEL RANKINGS:
+--------------------------------------------------
+1. Xgboost
+   Primary Score: 0.8880
+   All Metrics:
+     Accuracy: 0.8880
+     Precision: 0.8948
+     Recall: 0.8880
+     F1 Score: 0.8877
+     Roc Auc: 0.9411
+

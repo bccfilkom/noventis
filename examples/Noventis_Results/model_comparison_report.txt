@@ -1,0 +1,54 @@
+======================================================================
+         NOVENTIS AutoML - MODEL COMPARISON REPORT
+======================================================================
+
+Task Type: Classification
+Primary Metric: f1_score
+Best Model: Lightgbm
+
+MODEL RANKINGS:
+--------------------------------------------------
+1. Lightgbm
+   Primary Score: 0.9400
+   All Metrics:
+     Accuracy: 0.9400
+     Precision: 0.9400
+     Recall: 0.9400
+     F1 Score: 0.9400
+     Roc Auc: 0.9628
+
+2. Random Forest
+   Primary Score: 0.9100
+   All Metrics:
+     Accuracy: 0.9100
+     Precision: 0.9102
+     Recall: 0.9100
+     F1 Score: 0.9100
+     Roc Auc: 0.9664
+
+3. Automl
+   Primary Score: 0.9000
+   All Metrics:
+     Accuracy: 0.9000
+     Precision: 0.9007
+     Recall: 0.9000
+     F1 Score: 0.9000
+
+4. Xgboost
+   Primary Score: 0.8900
+   All Metrics:
+     Accuracy: 0.8900
+     Precision: 0.8902
+     Recall: 0.8900
+     F1 Score: 0.8900
+     Roc Auc: 0.9524
+
+5. Logistic Regression
+   Primary Score: 0.8289
+   All Metrics:
+     Accuracy: 0.8300
+     Precision: 0.8361
+     Recall: 0.8300
+     F1 Score: 0.8289
+     Roc Auc: 0.8952
+
