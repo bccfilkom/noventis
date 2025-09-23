@@ -55,7 +55,7 @@ class NoventisAutoML:
         self.time_budget=time_budget
         self.output_dir=output_dir
         self.model_list=models
-        self.use_automl = True if (compare or self.model_list is not None) else False 
+        self.use_automl = True if (compare or self.model_list is None) else False 
 
         self.flaml_model = None
         self.manual_model = None
@@ -174,13 +174,6 @@ class NoventisAutoML:
                 'best_config': self.flaml_model.best_config,
                 'training_history': self._get_training_history(f'{self.output_dir}/flaml.log')
             }
-            
-            # Save model
-            model_path = os.path.join(self.output_dir, 'best_automl_model.pkl')
-            self._save_model(self.flaml_model, model_path)
-            self.results['model_path'] = model_path
-            print(f"💾 Model berhasil disimpan di: {model_path}")
-        
         else:
             predictor = ManualPredictor(
                 model_name=self.model_list, 
@@ -216,17 +209,55 @@ class NoventisAutoML:
                     'best_config': None,
                     'training_history': None
                 }
+            
+            predictor.save_model(f'{self.output_dir}/best_model.pkl')
 
+
+        model_path = os.path.join(self.output_dir, 'best_automl_model.pkl')
         # Compare dengan model lain jika compare=True
         if self.compare:
             print("\n🔍 Memulai perbandingan dengan model lain...")
             comparison_results = self.compare_models(output_dir=self.output_dir, models_to_compare=self.model_list)
             self.results['model_comparison'] = comparison_results
-            print(f"\n🎉 Proses AutoML Selesai!")
+
+            # compare metrics in best manual model vs metrics in auto model
+            print('METRICS =', self.metrics)
+            best_manual_model_metrics = self.results['model_comparison']['rankings'][0]['score']
+            best_manual_model_name = self.results['model_comparison']['rankings'][0]['model']
+            automl_metrics = self.results['AutoML']['metrics'][self.metrics]
+            if best_manual_model_metrics > automl_metrics:
+                self.manual_model.save_model(f'{self.output_dir}/best_model.pkl')
+                self.results[best_manual_model_name]['model_path'] = model_path
+
+            else:
+                self._save_model(self.flaml_model, model_path)
+                self.results['AutoML']['model_path'] = model_path
+                print(f"🏆 Estimator terbaik: {self.flaml_model.best_estimator}")
+                print(f"📊 Metrics: {metrics}")
+
+            print(f"\n🎉 Proses Perbandingan Selesai!")
         else:
-            print(f"\n🎉 Proses AutoML Selesai!")
-            print(f"🏆 Estimator terbaik: {self.flaml_model.best_estimator}")
-            print(f"📊 Metrics: {metrics}")
+            # Save model
+            if self.use_automl:
+                self._save_model(self.flaml_model, model_path)
+                self.results['AutoML']['model_path'] = model_path
+                print(f"💾 Model berhasil disimpan di: {model_path}")
+            
+                print(f"\n🎉 Proses Perbandingan Selesai!")
+                print(f"🏆 Estimator terbaik: {self.flaml_model.best_estimator}")
+                print(f"📊 Metrics: {metrics}")
+            
+            else:
+                comparison_results = self.compare_models(output_dir=self.output_dir, models_to_compare=self.model_list)
+                self.results['model_comparison'] = comparison_results
+
+                print('METRICS =', self.metrics)
+                best_manual_model_metrics = self.results['model_comparison']['rankings'][0]['score']
+                best_manual_model_name = self.results['model_comparison']['rankings'][0]['model']
+                self.manual_model.save_model(f'{self.output_dir}/best_model.pkl')
+                self.results[best_manual_model_name]['model_path'] = model_path
+
+                print(f"\n🎉 Proses Perbandingan Selesai!")
 
         # Generate visualizations jika explain=True
         if self.explain:
@@ -306,17 +337,15 @@ class NoventisAutoML:
 
         # Test model manual lainnya
         for model in self.results:
-            if model == 'AutoML':
-                continue
             all_results[model] = self.results[model]
         
         # Ranking dan visualisasi
         ranked_results = self._rank_models(all_results)
-        self._visualize_model_comparison(ranked_results, all_results, output_dir)
-        self._generate_comparison_report(ranked_results, all_results, output_dir)
-        predictor.save_model(f'{self.output_dir}/best_model_without_automl.pkl')
-        
-        print(f"📊 Hasil perbandingan model disimpan di direktori '{output_dir}'.")
+
+        if self.compare:
+            self._visualize_model_comparison(ranked_results, all_results, output_dir)
+            self._generate_comparison_report(ranked_results, all_results, output_dir)
+            print(f"📊 Hasil perbandingan model disimpan di direktori '{output_dir}'.")
         return ranked_results
 
     def _eval_classification(self, y_true, y_pred) -> Dict:
@@ -325,7 +354,7 @@ class NoventisAutoML:
             'accuracy': accuracy_score(y_true, y_pred),
             'precision': precision_score(y_true, y_pred, average='weighted', zero_division=0),
             'recall': recall_score(y_true, y_pred, average='weighted', zero_division=0),
-            'f1_score': f1_score(y_true, y_pred, average='weighted', zero_division=0)
+            'f1_score': f1_score(y_true, y_pred, average='macro', zero_division=0)
         }
 
     def _eval_regression(self, y_true, y_pred) -> Dict:
@@ -344,7 +373,7 @@ class NoventisAutoML:
             return "macro_f1" if self.task_type == "classification" else "r2"
             # return 'auto'
         elif metric == 'f1_score':
-            return 'f1'
+            return 'macro_f1'
         elif metric == 'r2_score':
             return 'r2'
         return metric
@@ -392,13 +421,16 @@ class NoventisAutoML:
         """Generate comprehensive visualizations"""
         paths = []
         plt.style.use('default')  # Use default style for better compatibility
-        
+        if self.use_automl and not self.compare:
+            best_model_res = results['AutoML']
+        else:
+            best_model_res = results[results['model_comparison']['rankings'][0]['model']]
         try:
             if self.use_automl:
                 # 1. Feature Importance
-                if results['feature_importance'] is not None and not results['feature_importance'].empty:
-                    plt.figure(figsize=(12, max(6, len(results['feature_importance']) * 0.4)))
-                    top_features = results['feature_importance'].head(20)  # Top 20 features
+                if best_model_res['feature_importance'] is not None and not best_model_res['feature_importance'].empty:
+                    plt.figure(figsize=(12, max(6, len(best_model_res['feature_importance']) * 0.4)))
+                    top_features = best_model_res['feature_importance'].head(20)  # Top 20 features
                     
                     sns.barplot(x='importance', y='feature', data=top_features, palette='viridis')
                     plt.title('Top 20 Feature Importance', fontsize=16, fontweight='bold')
@@ -412,9 +444,9 @@ class NoventisAutoML:
                     plt.close()
 
                 # 2. Training History
-                if results['training_history'] is not None and not results['training_history'].empty:
+                if best_model_res['training_history'] is not None and not best_model_res['training_history'].empty:
                     plt.figure(figsize=(12, 6))
-                    history = results['training_history']
+                    history = best_model_res['training_history']
                     
                     plt.plot(history['time_seconds'], history['best_validation_loss'], 
                             marker='o', linestyle='-', color='b', linewidth=2, markersize=4)
@@ -430,10 +462,10 @@ class NoventisAutoML:
                     plt.close()
 
             # 3. Task-specific visualizations
-            if results['task_type'] == 'classification':
-                paths.extend(self._generate_classification_plots(results, output_dir))
+            if self.task_type == 'classification':
+                paths.extend(self._generate_classification_plots(best_model_res, output_dir))
             else:
-                paths.extend(self._generate_regression_plots(results, output_dir))
+                paths.extend(self._generate_regression_plots(best_model_res, output_dir))
                 
         except Exception as e:
             print(f"⚠️ Error saat membuat visualisasi: {e}")
@@ -444,6 +476,7 @@ class NoventisAutoML:
         """Generate classification-specific plots"""
         paths = []
         
+
         try:
             # Confusion Matrix
             plt.figure(figsize=(10, 8))
@@ -591,19 +624,19 @@ class NoventisAutoML:
                 # f.write(f"Best Estimator: {results['best_estimator']}\n")
                 # f.write(f"Best Configuration: {results['best_config']}\n\n")
                 
+                model_name = results['model_comparison']['rankings'][0]['model']
                 f.write("PERFORMANCE METRICS:\n")
+                f.write(f"Model: {model_name}\n")
                 f.write("-" * 30 + "\n")
-                for model_name in results:
-                    for metric, value in results[model_name]['metrics'].items():
-                        f.write(f"{metric.replace('_', ' ').title()}: {value:.4f}\n")
-                    
-                    if results[model_name]['feature_importance'] is not None:
-                        f.write(f"\nTOP 10 IMPORTANT FEATURES:\n")
-                        f.write("-" * 30 + "\n")
-                        for idx, row in results[model_name]['feature_importance'].head(10).iterrows():
-                            f.write(f"{row['feature']}: {row['importance']:.4f}\n")
+                for metric, value in results[model_name]['metrics'].items():
+                    f.write(f"{metric.replace('_', ' ').title()}: {value:.4f}\n")
                 
-                    f.write(f"\nModel saved at: {results['model_path']}\n")
+                if results[model_name]['feature_importance'] is not None:
+                    f.write(f"\nTOP 10 IMPORTANT FEATURES:\n")
+                    f.write("-" * 30 + "\n")
+                    for idx, row in results[model_name]['feature_importance'].head(10).iterrows():
+                        f.write(f"{row['feature']}: {row['importance']:.4f}\n")
+                
                 
             print(f"📄 Summary report disimpan di: {summary_path}")
             
@@ -619,13 +652,14 @@ class NoventisAutoML:
             primary_metric = 'f1_score' if self.metrics is None else self.metrics   
         else:
             primary_metric = 'r2_score' if self.metrics is None else self.metrics
+        self.metrics = primary_metric
         
         for name, res in results.items():
             if 'error' in res or 'metrics' not in res:
                 continue
                 
             score = res['metrics'].get(primary_metric, -1)      
-            model_display_name = name.replace('_', ' ').title()
+            model_display_name = name.replace('_', ' ')
             
             rankings.append({
                 'model': model_display_name,
@@ -823,37 +857,39 @@ class NoventisAutoML:
             print("❌ Tidak ada hasil untuk diekspor. Jalankan fit() terlebih dahulu.")
             return
         
+        best_model_res = self.results['model_comparison']['rankings'][0]
+        best_model_name = best_model_res['model']
         try:
             os.makedirs(output_dir, exist_ok=True)
             
             # Export predictions
             predictions_df = pd.DataFrame({
-                'actual': self.results['actual'],
-                'predicted': self.results['predictions']
+                'actual': self.results[best_model_name]['actual'],
+                'predicted': self.results[best_model_name]['predictions']
             })
             
-            if self.results['prediction_proba'] is not None:
-                proba_cols = [f'prob_class_{i}' for i in range(self.results['prediction_proba'].shape[1])]
-                proba_df = pd.DataFrame(self.results['prediction_proba'], columns=proba_cols)
+            if self.results[best_model_name]['prediction_proba'] is not None:
+                proba_cols = [f'prob_class_{i}' for i in range(self.results[best_model_name]['prediction_proba'].shape[1])]
+                proba_df = pd.DataFrame(self.results[best_model_name]['prediction_proba'], columns=proba_cols)
                 predictions_df = pd.concat([predictions_df, proba_df], axis=1)
             
             pred_path = os.path.join(output_dir, 'predictions.csv')
             predictions_df.to_csv(pred_path, index=False)
             
             # Export metrics
-            metrics_df = pd.DataFrame([self.results['metrics']])
+            metrics_df = pd.DataFrame([self.results[best_model_name]['metrics']])
             metrics_path = os.path.join(output_dir, 'metrics.csv')
             metrics_df.to_csv(metrics_path, index=False)
             
             # Export feature importance jika ada
-            if self.results['feature_importance'] is not None:
+            if self.results[best_model_name]['feature_importance'] is not None:
                 fi_path = os.path.join(output_dir, 'feature_importance.csv')
-                self.results['feature_importance'].to_csv(fi_path, index=False)
+                self.results[best_model_name]['feature_importance'].to_csv(fi_path, index=False)
             
             print(f"✅ Hasil berhasil diekspor ke direktori: {output_dir}")
             print(f"   • Prediksi: {pred_path}")
             print(f"   • Metrics: {metrics_path}")
-            if self.results['feature_importance'] is not None:
+            if self.results[best_model_name]['feature_importance'] is not None:
                 print(f"   • Feature Importance: {fi_path}")
                 
         except Exception as e:

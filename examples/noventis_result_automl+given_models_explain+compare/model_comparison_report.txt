@@ -4,6 +4,7 @@
 
 Task Type: Classification
 Primary Metric: f1_score
+<<<<<<< HEAD:examples/Noventis_Results/model_comparison_report.txt
 Best Model: Lightgbm
 
 MODEL RANKINGS:
@@ -51,4 +52,41 @@ MODEL RANKINGS:
      Recall: 0.8300
      F1 Score: 0.8289
      Roc Auc: 0.8952
+=======
+Best Model: xgboost
+
+MODEL RANKINGS:
+--------------------------------------------------
+1. xgboost
+   Primary Score: 0.8030
+   All Metrics:
+     Accuracy: 0.8053
+     Precision: 0.8014
+     Recall: 0.8053
+     F1 Score: 0.8030
+
+2. AutoML
+   Primary Score: 0.8029
+   All Metrics:
+     Accuracy: 0.8027
+     Precision: 0.7989
+     Recall: 0.8027
+     F1 Score: 0.8029
+
+3. lightgbm
+   Primary Score: 0.7975
+   All Metrics:
+     Accuracy: 0.8012
+     Precision: 0.7975
+     Recall: 0.8012
+     F1 Score: 0.7975
+
+4. decision tree
+   Primary Score: 0.7078
+   All Metrics:
+     Accuracy: 0.7002
+     Precision: 0.7011
+     Recall: 0.7002
+     F1 Score: 0.7078
+>>>>>>> 1c86ed69e078df3f9b492c60f35cc4ce875314c2:examples/noventis_result_automl+given_models_explain+compare/model_comparison_report.txt
 
