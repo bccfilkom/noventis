@@ -5,22 +5,22 @@
 Task Type: classification
 PERFORMANCE METRICS:
 ------------------------------
-Accuracy: 0.7906
-Precision: 0.7865
-Recall: 0.7906
-F1 Score: 0.7832
+Accuracy: 0.9000
+Precision: 0.9007
+Recall: 0.9000
+F1 Score: 0.9000
 
 TOP 10 IMPORTANT FEATURES:
 ------------------------------
-table: 31.8820
-depth: 31.5165
-y: 9.5089
-x: 9.0294
-price: 5.0568
-clarity: 4.0374
-color: 3.0190
-Unnamed_0: 2.5606
-z: 2.0555
-carat: 1.3339
+feature_14: 26.3401
+feature_4: 23.8036
+feature_0: 9.4015
+feature_7: 9.2837
+feature_3: 8.3723
+feature_12: 4.5005
+feature_6: 3.3326
+feature_10: 2.4949
+feature_11: 2.3742
+feature_9: 2.2269
 
-Model saved at: Noventis_Results\best_automl_model.pkl
+Model saved at: Noventis_Results/best_automl_model.pkl
