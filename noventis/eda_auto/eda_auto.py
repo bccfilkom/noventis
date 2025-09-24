@@ -8,6 +8,13 @@ import base64
 import uuid
 import scipy.stats as stats
 from typing import Union
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, accuracy_score
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+import warnings
+warnings.filterwarnings('ignore')
 
 # --- Helper Function ---
 def plot_to_base64(fig):
@@ -24,7 +31,7 @@ plt.rcParams.update({
     'grid.color': '#30363D', 'patch.edgecolor': '#30363D', 'figure.edgecolor': '#161B22',
 })
 
-class EDAAnalyzer:
+class NoventisAutoEDA:
     def __init__(self, data: Union[pd.DataFrame, str], target: str = None, personality: str = 'default'):
         if isinstance(data, str):
             try: df = pd.read_csv(data)
@@ -255,32 +262,511 @@ class EDAAnalyzer:
             return f"""<div class="grid-container"><div class="grid-item"><h4>Detected Problem Type</h4><p>{problem_type}</p></div><div class="grid-item"><h4>Unique Values</h4><p>{n_unique}</p></div></div><h3>Descriptive Statistics</h3><div class='table-scroll-wrapper'>{stats_df.to_html(classes='styled-table')}</div><div style="display: flex; gap: 2rem; margin-top: 2rem; flex-wrap: wrap;"><div class="plot-container" style="flex: 1; min-width: 400px;"><h4>Distribution Plot</h4><img src='{plot1_b64}'></div><div class="plot-container" style="flex: 1; min-width: 400px;"><h4>Box Plot</h4><img src='{plot2_b64}'></div></div>"""
         else: return f"<p>Could not determine problem type for target '{self.target}'. Dtype: {dtype}, Unique Values: {n_unique}.</p>"
     
+# ini yang kuedit
+
+    def _select_top_4_variables(self) -> list:
+        """
+        🆕 TAMBAHAN: Smart selection untuk top 4 variables berdasarkan multiple criteria
+        """
+        candidates = []
+        scores = {}
+        
+        # Criteria 1: Target correlation (if exists)
+        if self.target and self.target in self.numeric_cols_:
+            correlations = self.df[self.numeric_cols_].corrwith(self.df[self.target]).abs()
+            correlations = correlations.drop(self.target, errors='ignore').sort_values(ascending=False)
+            candidates.extend(correlations.head(2).index.tolist())
+        
+        # Criteria 2: High variance (variability)
+        numeric_cols = [col for col in self.numeric_cols_ if col != self.target]
+        if numeric_cols:
+            variances = self.df[numeric_cols].var().sort_values(ascending=False)
+            candidates.extend(variances.head(3).index.tolist())
+        
+        # Criteria 3: Data quality concerns (high missing rates)
+        missing_rates = self.df.isnull().mean()
+        high_missing = missing_rates[(missing_rates > 0.05) & (missing_rates < 0.8)]
+        candidates.extend(high_missing.index.tolist()[:2])
+        
+        # Criteria 4: Business relevance (domain keywords)
+        business_keywords = ['age', 'income', 'price', 'cost', 'revenue', 'score', 'rating', 'amount']
+        keyword_matches = [col for col in self.df.columns 
+                          if any(kw in col.lower() for kw in business_keywords)]
+        candidates.extend(keyword_matches[:2])
+        
+        # Remove duplicates and non-numeric
+        unique_candidates = []
+        for col in candidates:
+            if col in self.numeric_cols_ and col not in unique_candidates:
+                unique_candidates.append(col)
+        
+        # Return top 4, fallback to first 4 numeric columns if not enough candidates
+        if len(unique_candidates) >= 4:
+            return unique_candidates[:4]
+        else:
+            fallback = [col for col in self.numeric_cols_[:4] if col != self.target]
+            return (unique_candidates + fallback)[:4]
+    
+    def _academic_panel_distribution_test(self) -> str:
+        """
+        🆕 TAMBAHAN: Distribution Test Panel dengan Shapiro-Wilk untuk top 4 variables
+        """
+        if not self.numeric_cols_:
+            return "<div class='academic-panel-placeholder'><h4>Distribution Test</h4><p>No numeric columns available for distribution testing.</p></div>"
+        
+        top_vars = self._select_top_4_variables()
+        if not top_vars:
+            return "<div class='academic-panel-placeholder'><h4>Distribution Test</h4><p>Could not select variables for testing.</p></div>"
+        
+        panels_html = ""
+        for var in top_vars:
+            col_data = self.df[var].dropna()
+            if col_data.empty:
+                continue
+                
+            # Quick histogram untuk visual representation
+            fig, ax = plt.subplots(figsize=(3, 2.5))
+            ax.hist(col_data, bins=20, alpha=0.7, color='#58A6FF', edgecolor='#30363D')
+            ax.set_title('')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            hist_b64 = plot_to_base64(fig)
+            
+            # Shapiro-Wilk test
+            try:
+                if len(col_data) > 5000:
+                    # Sample untuk large datasets
+                    sample_data = col_data.sample(5000, random_state=42)
+                    shapiro_stat, shapiro_p = stats.shapiro(sample_data)
+                    note = "(sampled n=5000)"
+                else:
+                    shapiro_stat, shapiro_p = stats.shapiro(col_data)
+                    note = ""
+                
+                if shapiro_p > 0.05:
+                    badge_class = "badge-normal"
+                    badge_text = "✓"
+                    interpretation = "Normal"
+                else:
+                    badge_class = "badge-non-normal" 
+                    badge_text = "✗"
+                    interpretation = "Non-Normal"
+                    
+            except Exception:
+                badge_class = "badge-error"
+                badge_text = "?"
+                interpretation = "Test Failed"
+                shapiro_p = None
+                note = ""
+            
+            # Panel HTML
+            p_value_text = f"p={shapiro_p:.3f}" if shapiro_p is not None else "N/A"
+            panels_html += f"""
+            <div class="dist-test-panel">
+                <div class="var-name">{var}</div>
+                <div class="var-hist"><img src='{hist_b64}' alt='Distribution'></div>
+                <div class="test-result">
+                    <div class="result-badge {badge_class}">{badge_text}</div>
+                    <div class="result-text">{interpretation}</div>
+                    <div class="result-detail">{p_value_text} {note}</div>
+                </div>
+            </div>
+            """
+        
+        return f"""
+        <div class="distribution-test-container">
+            <div class="dist-test-grid">
+                {panels_html}
+            </div>
+            <div class="test-explanation">
+                <p><strong>Shapiro-Wilk Test:</strong> H₀: Data follows normal distribution</p>
+                <p><span class="badge-normal">✓</span> Normal (p > 0.05) | <span class="badge-non-normal">✗</span> Non-Normal (p ≤ 0.05)</p>
+            </div>
+        </div>
+        """
+    
+    def _calculate_vif(self, dataframe) -> dict:
+        """
+        🆕 TAMBAHAN: Calculate Variance Inflation Factor untuk multicollinearity detection
+        """
+        try:
+            # Hanya gunakan numeric columns dan remove target
+            vif_cols = [col for col in dataframe.select_dtypes(include=[np.number]).columns 
+                       if col != self.target]
+            
+            if len(vif_cols) < 2:
+                return {}
+                
+            vif_data = dataframe[vif_cols].dropna()
+            if vif_data.empty or len(vif_data) < 10:
+                return {}
+            
+            # Standardize data untuk VIF calculation
+            scaler = StandardScaler()
+            vif_scaled = pd.DataFrame(
+                scaler.fit_transform(vif_data), 
+                columns=vif_data.columns
+            )
+            
+            vif_dict = {}
+            for i, col in enumerate(vif_scaled.columns):
+                try:
+                    vif_value = variance_inflation_factor(vif_scaled.values, i)
+                    # Cap extreme values
+                    vif_dict[col] = min(vif_value, 999.9) if not np.isnan(vif_value) else 1.0
+                except:
+                    vif_dict[col] = 1.0
+                    
+            return vif_dict
+            
+        except Exception:
+            return {}
+    
+    def _academic_panel_correlation_validation(self) -> str:
+        """
+        🆕 TAMBAHAN: Correlation + VIF Analysis Panel
+        """
+        if len(self.numeric_cols_) < 2:
+            return "<div class='academic-panel-placeholder'><h4>Correlation Validation</h4><p>Not enough numeric features for correlation analysis.</p></div>"
+        
+        # Correlation heatmap (simplified untuk dashboard)
+        correlation_matrix = self.df[self.numeric_cols_].corr()
+        
+        # Ambil hanya correlations yang significant (> 0.5)
+        high_corr_pairs = []
+        for i, col1 in enumerate(correlation_matrix.columns):
+            for j, col2 in enumerate(correlation_matrix.columns):
+                if i < j:  # Avoid duplicates
+                    corr_val = correlation_matrix.loc[col1, col2]
+                    if abs(corr_val) > 0.5:
+                        high_corr_pairs.append((col1, col2, corr_val))
+        
+        # Create simplified correlation visualization
+        if len(self.numeric_cols_) <= 8:
+            fig, ax = plt.subplots(figsize=(6, 5))
+            sns.heatmap(correlation_matrix, annot=True, cmap='RdBu_r', center=0, 
+                       fmt='.2f', ax=ax, cbar_kws={'shrink': 0.8})
+            ax.set_title('Correlation Matrix')
+            corr_plot_b64 = plot_to_base64(fig)
+        else:
+            corr_plot_b64 = ""
+        
+        # VIF Analysis
+        vif_dict = self._calculate_vif(self.df)
+        
+        vif_alerts_html = ""
+        if vif_dict:
+            vif_alerts_html = "<div class='vif-alerts'><h4>VIF Alerts</h4><table class='vif-table'>"
+            vif_alerts_html += "<tr><th>Variable</th><th>VIF</th><th>Status</th></tr>"
+            
+            for var, vif_val in sorted(vif_dict.items(), key=lambda x: x[1], reverse=True):
+                if vif_val > 10:
+                    status = "<span class='vif-high'>⚠ HIGH</span>"
+                elif vif_val > 5:
+                    status = "<span class='vif-medium'>⚠ MEDIUM</span>"
+                else:
+                    status = "<span class='vif-ok'>✓ OK</span>"
+                
+                vif_alerts_html += f"<tr><td>{var}</td><td>{vif_val:.1f}</td><td>{status}</td></tr>"
+            
+            vif_alerts_html += "</table></div>"
+        else:
+            vif_alerts_html = "<div class='vif-alerts'><p>Could not calculate VIF values.</p></div>"
+        
+        # High correlation pairs
+        high_corr_html = ""
+        if high_corr_pairs:
+            high_corr_html = "<div class='high-corr-list'><h4>High Correlations (|r| > 0.5)</h4><ul>"
+            for col1, col2, corr_val in high_corr_pairs[:5]:  # Top 5
+                high_corr_html += f"<li><strong>{col1}</strong> ↔ <strong>{col2}</strong>: {corr_val:.3f}</li>"
+            high_corr_html += "</ul></div>"
+        else:
+            high_corr_html = "<div class='high-corr-list'><p>No high correlations found.</p></div>"
+        
+        return f"""
+        <div class="correlation-validation-container">
+            <div class="corr-val-grid">
+                <div class="corr-heatmap-section">
+                    {f"<img src='{corr_plot_b64}' alt='Correlation Matrix'>" if corr_plot_b64 else "<p>Matrix too large for visualization</p>"}
+                    {high_corr_html}
+                </div>
+                <div class="vif-section">
+                    {vif_alerts_html}
+                </div>
+            </div>
+        </div>
+        """
+    
+    def _fit_diagnostic_model(self):
+        """
+        🆕 TAMBAHAN: Fit simple model untuk diagnostics purposes
+        """
+        try:
+            if not self.target or self.target not in self.df.columns:
+                return None, None, None
+                
+            # Prepare data
+            feature_cols = [col for col in self.numeric_cols_ if col != self.target][:5]  # Limit to 5 features
+            if not feature_cols:
+                return None, None, None
+                
+            X = self.df[feature_cols].dropna()
+            y = self.df[self.target].loc[X.index].dropna()
+            
+            if len(X) < 10 or X.empty:
+                return None, None, None
+            
+            # Select model based on target type
+            target_unique = self.df[self.target].nunique()
+            if target_unique <= 10 and self.df[self.target].dtype in ['object', 'category', 'bool']:
+                # Classification
+                from sklearn.ensemble import RandomForestClassifier
+                model = RandomForestClassifier(n_estimators=50, random_state=42, max_depth=5)
+                scoring = 'accuracy'
+            else:
+                # Regression  
+                model = LinearRegression()
+                scoring = 'neg_mean_squared_error'
+            
+            # Fit model
+            model.fit(X, y)
+            
+            # Cross-validation
+            cv_scores = cross_val_score(model, X, y, cv=min(5, len(X)//2), scoring=scoring)
+            
+            # Predictions untuk residuals
+            y_pred = model.predict(X)
+            
+            return model, (X, y, y_pred), cv_scores
+            
+        except Exception:
+            return None, None, None
+    
+    def _academic_panel_model_diagnostics(self) -> str:
+        """
+        🆕 TAMBAHAN: Model Diagnostics Panel dengan residuals, CV score, feature importance
+        """
+        if not self.target:
+            return "<div class='academic-panel-placeholder'><h4>Model Diagnostics</h4><p>Requires a target variable for model diagnostics.</p></div>"
+        
+        model, data_tuple, cv_scores = self._fit_diagnostic_model()
+        
+        if model is None:
+            return "<div class='academic-panel-placeholder'><h4>Model Diagnostics</h4><p>Could not fit diagnostic model with available data.</p></div>"
+        
+        X, y, y_pred = data_tuple
+        
+        # 1. Mini Residual Plot
+        residuals = y - y_pred
+        fig_res, ax_res = plt.subplots(figsize=(4, 3))
+        ax_res.scatter(y_pred, residuals, alpha=0.6, color='#58A6FF', s=20)
+        ax_res.axhline(y=0, color='#F78166', linestyle='--', alpha=0.8)
+        ax_res.set_xlabel('Fitted Values')
+        ax_res.set_ylabel('Residuals')
+        ax_res.set_title('Residuals vs Fitted')
+        
+        # Check for patterns (simplified)
+        residual_pattern = "Random ✓" if abs(stats.pearsonr(y_pred, residuals)[0]) < 0.3 else "Pattern Detected ⚠"
+        
+        residual_plot_b64 = plot_to_base64(fig_res)
+        
+        # 2. CV Score Gauge
+        cv_mean = cv_scores.mean()
+        cv_std = cv_scores.std()
+        
+        # Convert to percentage for display (handle negative scores like neg_mean_squared_error)
+        if cv_mean < 0:  # neg_mean_squared_error case
+            display_score = max(0, 100 + cv_mean * 10)  # Simple conversion
+            score_type = "R² Score"
+        else:  # accuracy case
+            display_score = cv_mean * 100
+            score_type = "Accuracy"
+        
+        # Gauge visualization
+        fig_gauge, ax_gauge = plt.subplots(figsize=(3, 3), subplot_kw={'aspect': 'equal'})
+        
+        # Simple gauge using pie chart
+        if display_score >= 80:
+            colors = ['#28A745', '#E6E6E6']
+            gauge_label = "EXCELLENT"
+        elif display_score >= 60:
+            colors = ['#FFC107', '#E6E6E6'] 
+            gauge_label = "GOOD"
+        else:
+            colors = ['#DC3545', '#E6E6E6']
+            gauge_label = "POOR"
+        
+        wedges, texts = ax_gauge.pie([display_score, 100-display_score], 
+                                    colors=colors, startangle=90,
+                                    wedgeprops=dict(width=0.4))
+        ax_gauge.text(0, 0, f'{display_score:.0f}%', ha='center', va='center', 
+                     fontsize=16, weight='bold', color='white')
+        ax_gauge.text(0, -0.3, gauge_label, ha='center', va='center', 
+                     fontsize=10, color='white')
+        
+        gauge_plot_b64 = plot_to_base64(fig_gauge)
+        
+        # 3. Feature Importance (Top 3)
+        if hasattr(model, 'feature_importances_'):
+            # Random Forest
+            importance_values = model.feature_importances_
+        elif hasattr(model, 'coef_'):
+            # Linear model
+            importance_values = np.abs(model.coef_)
+        else:
+            importance_values = np.ones(len(X.columns))
+        
+        feature_importance = pd.Series(importance_values, index=X.columns).sort_values(ascending=False)
+        top_3_features = feature_importance.head(3)
+        
+        importance_html = "<div class='feature-importance'><h4>Top 3 Important Features</h4>"
+        max_importance = top_3_features.iloc[0] if len(top_3_features) > 0 else 1
+        
+        for feature, importance in top_3_features.items():
+            bar_width = (importance / max_importance) * 100
+            importance_html += f"""
+            <div class='importance-item'>
+                <span class='feature-name'>{feature}</span>
+                <div class='importance-bar'>
+                    <div class='importance-fill' style='width: {bar_width}%'></div>
+                </div>
+                <span class='importance-value'>{importance:.3f}</span>
+            </div>
+            """
+        importance_html += "</div>"
+        
+        return f"""
+        <div class="model-diagnostics-container">
+            <div class="diag-grid">
+                <div class="residual-section">
+                    <h4>Residuals</h4>
+                    <img src='{residual_plot_b64}' alt='Residual Plot'>
+                    <p class="pattern-check">{residual_pattern}</p>
+                </div>
+                <div class="cv-score-section">  
+                    <h4>CV {score_type}</h4>
+                    <img src='{gauge_plot_b64}' alt='CV Score Gauge'>
+                    <p class="cv-detail">±{cv_std:.2f} std</p>
+                </div>
+                <div class="importance-section">
+                    {importance_html}
+                </div>
+            </div>
+        </div>
+        """
+    
+    def _generate_academic_dashboard(self) -> str:
+        """
+        🆕 TAMBAHAN: Generate complete Academic Statistical Validation Dashboard
+        """
+        panel1 = self._academic_panel_distribution_test()
+        panel2 = self._academic_panel_correlation_validation()  
+        panel3 = self._academic_panel_model_diagnostics()
+        
+        return f"""
+        <div class="academic-dashboard-container">
+            <div class="academic-panel-grid">
+                <div class="academic-panel">
+                    <h3>Distribution Test</h3>
+                    {panel1}
+                </div>
+                <div class="academic-panel">
+                    <h3>Correlation Validation</h3>
+                    {panel2}
+                </div>
+                <div class="academic-panel">
+                    <h3>Model Diagnostics</h3>
+                    {panel3}
+                </div>
+            </div>
+        </div>
+        """
+        
+    
     def generate_html_report(self, report_height: int, show_base_viz: bool) -> HTML:
         tabs_config = []; report_title = "Noventis Automated EDA Report"
         if self.personality in ['business', 'all']:
             report_title = "Noventis Business Intelligence Report"
-            tabs_config.append({'id': 'business_impact', 'title': '🚀 Business Impact', 'content_func': self._generate_business_impact_dashboard})
+            tabs_config.append({'id': 'business_impact', 'title': 'Business Impact', 'content_func': self._generate_business_impact_dashboard})
         if self.personality in ['academic', 'all']:
             report_title = "Noventis Academic Diagnostic Dashboard"
-            tabs_config.append({'id': 'academic_diag', 'title': '✨ Statistical Validation', 'content_func': lambda: "<h2>Konten Academic Dashboard akan ada di sini.</h2>"})
+            tabs_config.append({'id': 'academic_diag', 'title': 'Statistical Validation', 'content_func': self._generate_academic_dashboard})
         if show_base_viz:
             base_tabs = [
-                {'id': 'overview', 'title': '📊 Overview', 'content_func': self._generate_overview},
-                {'id': 'stats', 'title': '🔢 Descriptive Stats', 'content_func': self._generate_descriptive_stats},
-                {'id': 'missing', 'title': '💧 Missing Values', 'content_func': self._analyze_missing_values},
-                {'id': 'outliers', 'title': '📈 Outlier Distribution', 'content_func': self._analyze_outliers},
-                {'id': 'num_dist', 'title': '📉 Numerical Distribution', 'content_func': self._analyze_numerical_distributions},
-                {'id': 'correlation', 'title': '🔗 Correlation', 'content_func': self._plot_correlation_report},
+                {'id': 'overview', 'title': 'Overview', 'content_func': self._generate_overview},
+                {'id': 'stats', 'title': 'Descriptive Stats', 'content_func': self._generate_descriptive_stats},
+                {'id': 'missing', 'title': 'Missing Values', 'content_func': self._analyze_missing_values},
+                {'id': 'outliers', 'title': 'Outlier Distribution', 'content_func': self._analyze_outliers},
+                {'id': 'num_dist', 'title': 'Numerical Distribution', 'content_func': self._analyze_numerical_distributions},
+                {'id': 'correlation', 'title': 'Correlation', 'content_func': self._plot_correlation_report},
             ]
-            if self.target: base_tabs.insert(1, {'id': 'target', 'title': '🎯 Target Analysis', 'content_func': self._analyze_target_variable})
+            if self.target: base_tabs.insert(1, {'id': 'target', 'title': 'Target Analysis', 'content_func': self._analyze_target_variable})
             tabs_config.extend(base_tabs)
         if not tabs_config:
-             tabs_config.append({'id': 'overview', 'title': '📊 Overview', 'content_func': self._generate_overview})
+            tabs_config.append({'id': 'overview', 'title': 'Overview', 'content_func': self._generate_overview})
         navbar_html = ""; main_content_html = ""
         for i, tab in enumerate(tabs_config):
             active_class = 'active' if i == 0 else ''
             navbar_html += f"""<button class="nav-btn {active_class}" onclick="showTab(event, '{tab['id']}', '{self.report_id}')">{tab['title']}</button>"""
-            content = tab['content_func'](); main_content_html += f"""<section id="{tab['id']}-{self.report_id}" class="content-section {active_class}"><h2>{tab['title'].split(' ', 1)[1]}</h2>{content}</section>"""
+            content = tab['content_func'](); main_content_html += f"""<section id="{tab['id']}-{self.report_id}" class="content-section {active_class}"><h2>{tab['title']}</h2>{content}</section>"""
+        
+        # 🆕 TAMBAHAN: Extended CSS untuk Academic Dashboard components
+        extended_css = """
+        /* Academic Dashboard Styles */
+        .academic-dashboard-container { margin-top: 2rem; }
+        .academic-panel-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; height: 500px; }
+        .academic-panel { background-color: var(--bg-dark-2); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; overflow-y: auto; }
+        .academic-panel h3 { margin-top: 0; color: var(--primary-blue); font-size: 1.2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+        
+        /* Distribution Test Panel */
+        .distribution-test-container { height: 100%; display: flex; flex-direction: column; }
+        .dist-test-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; flex: 1; }
+        .dist-test-panel { display: flex; flex-direction: column; align-items: center; padding: 0.5rem; background-color: var(--bg-dark-3); border-radius: 5px; }
+        .var-name { font-size: 0.9rem; font-weight: bold; margin-bottom: 0.5rem; color: var(--text-light); }
+        .var-hist img { width: 80px; height: 60px; margin-bottom: 0.5rem; }
+        .test-result { text-align: center; }
+        .result-badge { width: 25px; height: 25px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: 0.3rem; }
+        .badge-normal { background-color: #28A745; color: white; }
+        .badge-non-normal { background-color: #DC3545; color: white; }
+        .badge-error { background-color: #6C757D; color: white; }
+        .result-text { font-size: 0.8rem; color: var(--text-light); margin-bottom: 0.2rem; }
+        .result-detail { font-size: 0.7rem; color: var(--text-muted); }
+        .test-explanation { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted); }
+        
+        /* Correlation Validation Panel */
+        .correlation-validation-container { height: 100%; }
+        .corr-val-grid { display: grid; grid-template-rows: 2fr 1fr; gap: 1rem; height: 100%; }
+        .corr-heatmap-section img { max-width: 100%; height: auto; max-height: 200px; }
+        .high-corr-list { margin-top: 1rem; }
+        .high-corr-list ul { list-style: none; padding: 0; font-size: 0.8rem; }
+        .high-corr-list li { margin-bottom: 0.3rem; color: var(--text-muted); }
+        .vif-alerts h4 { margin-bottom: 0.5rem; font-size: 1rem; }
+        .vif-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; }
+        .vif-table th, .vif-table td { padding: 0.3rem 0.5rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .vif-table th { background-color: var(--bg-dark-3); }
+        .vif-ok { color: #28A745; font-weight: bold; }
+        .vif-medium { color: #FFC107; font-weight: bold; }
+        .vif-high { color: #DC3545; font-weight: bold; }
+        
+        /* Model Diagnostics Panel */
+        .model-diagnostics-container { height: 100%; }
+        .diag-grid { display: grid; grid-template-rows: 1fr 1fr 1fr; gap: 1rem; height: 100%; }
+        .residual-section, .cv-score-section, .importance-section { display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .residual-section img, .cv-score-section img { max-width: 100%; height: auto; max-height: 120px; }
+        .pattern-check, .cv-detail { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; }
+        .feature-importance { width: 100%; }
+        .importance-item { display: grid; grid-template-columns: 1fr 2fr auto; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; font-size: 0.8rem; }
+        .feature-name { color: var(--text-light); }
+        .importance-bar { background-color: var(--bg-dark-3); height: 12px; border-radius: 6px; overflow: hidden; }
+        .importance-fill { background-color: var(--primary-blue); height: 100%; transition: width 0.3s ease; }
+        .importance-value { color: var(--text-muted); font-size: 0.7rem; }
+        
+        .academic-panel-placeholder { display: flex; align-items: center; justify-content: center; height: 200px; text-align: center; color: var(--text-muted); }
+        """
         
         html_template = f"""
         <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>{report_title}</title>
@@ -328,6 +814,8 @@ class EDAAnalyzer:
             .clean-list {{ list-style: none; padding: 0; text-align: left;}}
             .detail-header {{ margin-top: 2rem; margin-bottom: 1rem; text-align: center; }}
             .biz-details-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; width: 100%; }}
+            
+            {extended_css}
         </style>
         </head><body><div id="{self.report_id}" class="report-frame"><div class="container">
             <header><h1>{report_title}</h1><p>A comprehensive overview of the dataset's characteristics.</p></header>
@@ -373,10 +861,11 @@ class EDAAnalyzer:
         """
         return HTML(html_template)
 
-    def run(self, report_height: int = 800, show_base_viz: bool = True) -> HTML:
+
+    def run(self, show_base_viz: bool = True) -> HTML:
         if not show_base_viz and self.personality == 'default':
             raise ValueError("Jika base_viz=False, Anda harus memilih 'personality' ('academic', 'business', atau 'all').")
         print(f"Generating EDA report with '{self.personality}' personality, please wait...")
-        report_html = self.generate_html_report(report_height=report_height, show_base_viz=show_base_viz)
+        report_html = self.generate_html_report(report_height=800, show_base_viz=show_base_viz)
         print("Report generated successfully. Displaying below.")
         return report_html

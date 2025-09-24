@@ -1,5 +1,5 @@
-from .eda_auto import EDAAnalyzer
+from .eda_auto import NoventisAutoEDA
 
 __all__ = [
-    'EDAAnalyzer'
+    'NoventisAutoEDA'
 ]
