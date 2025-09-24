@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ================================================================================
                 NOVENTIS AUTOML - COMPREHENSIVE MODEL ANALYSIS
 ================================================================================
@@ -38,3 +39,31 @@ RECOMMendations for Model Improvement:
 • Consider collecting more training data if current dataset is limited
 • Evaluate model performance on different data splits for robustness
 • Implement cross-validation for more reliable performance estimates
+=======
+============================================================
+         NOVENTIS AutoML - MODEL SUMMARY
+============================================================
+
+Task Type: classification
+PERFORMANCE METRICS:
+------------------------------
+Accuracy: 0.9000
+Precision: 0.9007
+Recall: 0.9000
+F1 Score: 0.9000
+
+TOP 10 IMPORTANT FEATURES:
+------------------------------
+feature_14: 26.3401
+feature_4: 23.8036
+feature_0: 9.4015
+feature_7: 9.2837
+feature_3: 8.3723
+feature_12: 4.5005
+feature_6: 3.3326
+feature_10: 2.4949
+feature_11: 2.3742
+feature_9: 2.2269
+
+Model saved at: Noventis_Results/best_automl_model.pkl
+>>>>>>> b6f4cb8c8878da79e8254289c9869fb6d5e8bb73

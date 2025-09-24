@@ -216,7 +216,11 @@ class NoventisAutoML:
             all_model_results = result['all_model_results']
             for model_result in all_model_results:
                 if 'error' in model_result:
+<<<<<<< HEAD
                     print(f"Warning: Skipping model '{model_result.get('model_name', 'Unknown')}' due to training failure.")
+=======
+                    print(f"⚠️  Peringatan: Melewati model '{model_result.get('model_name', 'Unknown')}' karena gagal saat training.")
+>>>>>>> b6f4cb8c8878da79e8254289c9869fb6d5e8bb73
                     continue
                 model_name = model_result['model_name']
                 metrics = model_result['metrics']
@@ -323,7 +327,11 @@ class NoventisAutoML:
             all_model_results = result['all_model_results']
             for model_result in all_model_results:
                 if 'error' in model_result:
+<<<<<<< HEAD
                     print(f"Warning: Skipping model '{model_result.get('model_name', 'Unknown')}' due to training failure.")
+=======
+                    print(f"⚠️  Peringatan: Melewati model '{model_result.get('model_name', 'Unknown')}' karena gagal saat training.")
+>>>>>>> b6f4cb8c8878da79e8254289c9869fb6d5e8bb73
                     continue
 
                 model_name = model_result['model_name']
