@@ -4,16 +4,9 @@
 
 Task Type: Classification
 Primary Metric: accuracy
-Best Model: Xgboost
+Best Model: xgboost
 
 MODEL RANKINGS:
 --------------------------------------------------
-1. Xgboost
-   Primary Score: 0.8880
-   All Metrics:
-     Accuracy: 0.8880
-     Precision: 0.8948
-     Recall: 0.8880
-     F1 Score: 0.8877
-     Roc Auc: 0.9411
-
+1. xgboost - Score: 0.8880
+2. AutoML - Score: 0.8800

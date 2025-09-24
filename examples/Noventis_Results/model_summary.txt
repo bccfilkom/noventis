@@ -1,26 +1,40 @@
-============================================================
-         NOVENTIS AutoML - MODEL SUMMARY
-============================================================
+================================================================================
+                NOVENTIS AUTOML - COMPREHENSIVE MODEL ANALYSIS
+================================================================================
 
-Task Type: regression
-PERFORMANCE METRICS:
+Task Type: CLASSIFICATION
+Dataset Shape: (500, 16)
+Training Duration Budget: 30 seconds
+
+BEST MODEL PERFORMANCE SUMMARY
+--------------------------------------------------
+Champion Model: lightgbm
+Primary Metric (f1_score): 0.9400
+
+DETAILED METRICS:
 ------------------------------
-Mae: 29.7713
-Mse: 1750.0351
-Rmse: 41.8334
-R2 Score: 0.9441
+Accuracy            : 0.9400 (Excellent)
+Precision           : 0.9400 (Excellent)
+Recall              : 0.9400 (Excellent)
+F1 Score            : 0.9400 (Excellent)
 
-TOP 10 IMPORTANT FEATURES:
+MODEL ANALYSIS & INSIGHTS:
+----------------------------------------
+• Model shows excellent accuracy performance, suitable for production deployment
+
+MODEL RANKING SUMMARY:
 ------------------------------
-attr_1: 288.6193
-attr_8: 284.2781
-attr_7: 240.8962
-attr_4: 123.4158
-attr_3: 104.9856
-attr_5: 72.8583
-attr_6: 3.7265
-attr_2: -0.7915
-attr_0: -6.7802
-attr_9: -8.7844
+1. lightgbm            : 0.9400
+2. gradient boosting   : 0.9200
+3. random forest       : 0.9100
+4. AutoML              : 0.9000
+5. catboost            : 0.9000
 
-Model saved at: Noventis_Results/best_automl_model.pkl
+RECOMMendations for Model Improvement:
+--------------------------------------------------
+• Multiple models show similar performance - consider ensemble methods
+• Increase time_budget parameter for potentially better model discovery
+• Experiment with feature engineering techniques (scaling, encoding, interactions)
+• Consider collecting more training data if current dataset is limited
+• Evaluate model performance on different data splits for robustness
+• Implement cross-validation for more reliable performance estimates

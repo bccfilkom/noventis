@@ -1,6 +1,3 @@
-# =======================================================================
-#                           CORE IMPORTS
-# =======================================================================
 import pandas as pd
 import numpy as np
 import pickle
@@ -11,25 +8,17 @@ import os
 from datetime import datetime
 from typing import Dict, Any, List, Union, Optional
 
-# =======================================================================
-#                     REPORTING & VISUALIZATION
-# =======================================================================
 import io
 import base64
 import matplotlib.pyplot as plt
 from IPython.display import display, HTML
 warnings.filterwarnings('ignore') # Suppress warnings for a cleaner output
 
-# =======================================================================
-#                HYPERPARAMETER TUNING & EXPLAINABILITY
-# =======================================================================
 import optuna
 import shap
 optuna.logging.set_verbosity(optuna.logging.ERROR) # Show only errors from Optuna
 
-# =======================================================================
-#                      SCIKIT-LEARN UTILITIES
-# =======================================================================
+
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, train_test_split, KFold
 from sklearn.preprocessing import PolynomialFeatures, OneHotEncoder
 from sklearn.compose import ColumnTransformer
@@ -39,9 +28,6 @@ from sklearn.metrics import (
     mean_squared_error, mean_absolute_error, r2_score
 )
 
-# =======================================================================
-#                         MODEL LIBRARIES
-# =======================================================================
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.ensemble import (
@@ -51,19 +37,12 @@ from sklearn.ensemble import (
 import xgboost as xgb
 import lightgbm as lgb
 import catboost as cb
-
-# =======================================================================
-#                      OPTIONAL DEPENDENCIES
-# =======================================================================
 try:
     # Attempt to import a custom data cleaner if available
     from noventis_beta.data_cleaner import NoventisDataCleaner
 except ImportError:
     NoventisDataCleaner = None # If not found, set to None to avoid errors
 
-# =======================================================================
-#                          LOGGING SETUP
-# =======================================================================
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - [%(levelname)s] - %(message)s',
@@ -71,11 +50,6 @@ logging.basicConfig(
 )
 
 
-# =======================================================================
-#               MODEL & HYPERPARAMETER CONFIGURATION
-# =======================================================================
-# These functions define the hyperparameter search space for Optuna.
-# Each function takes an Optuna 'trial' object and suggests parameter values.
 
 def get_rf_params(trial: optuna.Trial) -> Dict[str, Any]:
     """Defines the search space for Random Forest Classifier."""
