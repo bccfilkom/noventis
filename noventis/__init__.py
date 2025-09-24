@@ -5,9 +5,12 @@ from .data_cleaner.scaling import NoventisScaler
 from .data_cleaner.imputing import NoventisImputer
 from .data_cleaner.outlier_handling import NoventisOutlierHandler
 
+from .eda_auto.eda_auto import NoventisAutoEDA
+
 # Tambahkan impor dari predictor
 from .predictor.manual import ManualPredictor
 from .predictor.auto import NoventisAutoML
+
 
 __all__ = [
     'data_cleaner',
@@ -15,6 +18,7 @@ __all__ = [
     'NoventisScaler',
     'NoventisImputer',
     'NoventisOutlierHandler',
+    'NoventisAutoEDA',
     'ManualPredictor',
     'NoventisAutoML'
 ]
