@@ -4,6 +4,14 @@
 
 Task Type: Classification
 Primary Metric: accuracy
+<<<<<<< HEAD
+Best Model: xgboost
+
+MODEL RANKINGS:
+--------------------------------------------------
+1. xgboost - Score: 0.8880
+2. AutoML - Score: 0.8800
+=======
 Best Model: Xgboost
 
 MODEL RANKINGS:
@@ -17,3 +25,4 @@ MODEL RANKINGS:
      F1 Score: 0.8877
      Roc Auc: 0.9411
 
+>>>>>>> b6f4cb8c8878da79e8254289c9869fb6d5e8bb73

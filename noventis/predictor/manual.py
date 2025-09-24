@@ -1,6 +1,3 @@
-# =======================================================================
-#                           CORE IMPORTS
-# =======================================================================
 import pandas as pd
 import numpy as np
 import pickle
@@ -22,9 +19,6 @@ import os
 from datetime import datetime
 from typing import Dict, Any, List, Union, Optional
 
-# =======================================================================
-#                     REPORTING & VISUALIZATION
-# =======================================================================
 import io
 import base64
 import matplotlib.pyplot as plt
@@ -32,9 +26,6 @@ from IPython.display import display, HTML
 warnings.filterwarnings('ignore') # Suppress warnings for a cleaner output
 >>>>>>> 1c86ed69e078df3f9b492c60f35cc4ce875314c2
 
-# =======================================================================
-#                HYPERPARAMETER TUNING & EXPLAINABILITY
-# =======================================================================
 import optuna
 import shap
 <<<<<<< HEAD
@@ -43,9 +34,7 @@ from sklearn.preprocessing import PolynomialFeatures, OneHotEncoder, RobustScale
 =======
 optuna.logging.set_verbosity(optuna.logging.ERROR) # Show only errors from Optuna
 
-# =======================================================================
-#                      SCIKIT-LEARN UTILITIES
-# =======================================================================
+
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, train_test_split, KFold
 from sklearn.preprocessing import PolynomialFeatures, OneHotEncoder
 >>>>>>> 1c86ed69e078df3f9b492c60f35cc4ce875314c2
@@ -59,6 +48,8 @@ from sklearn.metrics import (
 )
 from sklearn.ensemble import StackingClassifier, StackingRegressor
 
+<<<<<<< HEAD
+=======
 try:
     from imblearn.pipeline import Pipeline as ImbPipeline
     from imblearn.over_sampling import SMOTE, RandomOverSampler
@@ -80,6 +71,7 @@ except ImportError:
 #                         MODEL LIBRARIES
 # =======================================================================
 >>>>>>> 1c86ed69e078df3f9b492c60f35cc4ce875314c2
+>>>>>>> b6f4cb8c8878da79e8254289c9869fb6d5e8bb73
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.ensemble import (
@@ -89,6 +81,8 @@ from sklearn.ensemble import (
 import xgboost as xgb
 import lightgbm as lgb
 import catboost as cb
+<<<<<<< HEAD
+=======
 
 <<<<<<< HEAD
 warnings.filterwarnings('ignore')
@@ -97,16 +91,20 @@ optuna.logging.set_verbosity(optuna.logging.ERROR)
 # =======================================================================
 #                      OPTIONAL DEPENDENCIES
 # =======================================================================
+>>>>>>> b6f4cb8c8878da79e8254289c9869fb6d5e8bb73
 try:
     # Attempt to import a custom data cleaner if available
     from noventis_beta.data_cleaner import NoventisDataCleaner
 except ImportError:
     NoventisDataCleaner = None # If not found, set to None to avoid errors
 
+<<<<<<< HEAD
+=======
 # =======================================================================
 #                          LOGGING SETUP
 # =======================================================================
 >>>>>>> 1c86ed69e078df3f9b492c60f35cc4ce875314c2
+>>>>>>> b6f4cb8c8878da79e8254289c9869fb6d5e8bb73
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - [%(levelname)s] - %(message)s',
@@ -115,6 +113,8 @@ logging.basicConfig(
 
 
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
 def get_rf_params(trial):
 =======
 # =======================================================================
@@ -122,6 +122,7 @@ def get_rf_params(trial):
 # =======================================================================
 # These functions define the hyperparameter search space for Optuna.
 # Each function takes an Optuna 'trial' object and suggests parameter values.
+>>>>>>> b6f4cb8c8878da79e8254289c9869fb6d5e8bb73
 
 def get_rf_params(trial: optuna.Trial) -> Dict[str, Any]:
     """Defines the search space for Random Forest Classifier."""

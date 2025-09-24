@@ -1,3 +1,45 @@
+<<<<<<< HEAD
+================================================================================
+                NOVENTIS AUTOML - COMPREHENSIVE MODEL ANALYSIS
+================================================================================
+
+Task Type: CLASSIFICATION
+Dataset Shape: (500, 16)
+Training Duration Budget: 30 seconds
+
+BEST MODEL PERFORMANCE SUMMARY
+--------------------------------------------------
+Champion Model: lightgbm
+Primary Metric (f1_score): 0.9400
+
+DETAILED METRICS:
+------------------------------
+Accuracy            : 0.9400 (Excellent)
+Precision           : 0.9400 (Excellent)
+Recall              : 0.9400 (Excellent)
+F1 Score            : 0.9400 (Excellent)
+
+MODEL ANALYSIS & INSIGHTS:
+----------------------------------------
+• Model shows excellent accuracy performance, suitable for production deployment
+
+MODEL RANKING SUMMARY:
+------------------------------
+1. lightgbm            : 0.9400
+2. gradient boosting   : 0.9200
+3. random forest       : 0.9100
+4. AutoML              : 0.9000
+5. catboost            : 0.9000
+
+RECOMMendations for Model Improvement:
+--------------------------------------------------
+• Multiple models show similar performance - consider ensemble methods
+• Increase time_budget parameter for potentially better model discovery
+• Experiment with feature engineering techniques (scaling, encoding, interactions)
+• Consider collecting more training data if current dataset is limited
+• Evaluate model performance on different data splits for robustness
+• Implement cross-validation for more reliable performance estimates
+=======
 ============================================================
          NOVENTIS AutoML - MODEL SUMMARY
 ============================================================
@@ -24,3 +66,4 @@ feature_11: 2.3742
 feature_9: 2.2269
 
 Model saved at: Noventis_Results/best_automl_model.pkl
+>>>>>>> b6f4cb8c8878da79e8254289c9869fb6d5e8bb73

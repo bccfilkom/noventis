@@ -2,6 +2,17 @@
          NOVENTIS AutoML - MODEL SUMMARY
 ============================================================
 
+<<<<<<< HEAD
+Task Type: Classification
+Best Model: xgboost
+
+PERFORMANCE METRICS:
+------------------------------
+Accuracy: 0.8880
+Precision: 0.8948
+Recall: 0.8880
+F1 Score: 0.8878
+=======
 Task Type: classification
 PERFORMANCE METRICS:
 ------------------------------
@@ -24,3 +35,4 @@ feature_9: 0.0272
 feature_1: 0.0195
 
 Model saved at: Full_Run_Churn_Analysis/best_automl_model.pkl
+>>>>>>> b6f4cb8c8878da79e8254289c9869fb6d5e8bb73
