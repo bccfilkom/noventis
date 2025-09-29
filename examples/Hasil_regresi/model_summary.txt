@@ -1,0 +1,8 @@
+============================================================
+         NOVENTIS AutoML - MODEL SUMMARY
+============================================================
+
+Task Type: regression
+PERFORMANCE METRICS:
+Model: linear regression
+------------------------------
