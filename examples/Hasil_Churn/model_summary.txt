@@ -2,7 +2,11 @@
          NOVENTIS AutoML - MODEL SUMMARY
 ============================================================
 
-Task Type: regression
+Task Type: classification
 PERFORMANCE METRICS:
-Model: linear regression
+Model: lightgbm
 ------------------------------
+Accuracy: 0.9400
+Precision: 0.9400
+Recall: 0.9400
+F1 Score: 0.9400

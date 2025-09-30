@@ -17,12 +17,12 @@ MODEL RANKINGS:
      R2 Score: 0.9923
 
 2. AutoML
-   Primary Score: 0.9382
+   Primary Score: 0.9431
    All Metrics:
-     Mae: 32.0542
-     Mse: 1933.1525
-     Rmse: 43.9676
-     R2 Score: 0.9382
+     Mae: 30.2231
+     Mse: 1780.0056
+     Rmse: 42.1901
+     R2 Score: 0.9431
 
 3. catboost
    Primary Score: 0.8876
