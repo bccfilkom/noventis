@@ -33,7 +33,7 @@ class NoventisScaler:
                  skew_threshold: float = 2.0,
                  outlier_threshold: float = 0.01,
                  normality_alpha: float = 0.05,
-                 verbose: bool = True):
+                 verbose: bool = False):
         """
         Initializes the NoventisScaler.
 

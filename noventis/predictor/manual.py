@@ -360,7 +360,7 @@ class ManualPredictor:
         compare: bool = False,
         explain: bool = False,
         chosen_metric: Optional[str] = None,
-        display_report: bool = False
+        display_report: bool = True
     ) -> Dict[str, Any]:
         X = df.drop(columns=[target_column])
         y = df[target_column]
@@ -1035,7 +1035,7 @@ class ManualPredictor:
     <body>
         <div id="manual-predictor-report"> <div class="container">
                 <header>
-                    # <img src="{logo_data_uri}" alt="Noventis Logo" style="height: 50px; margin-bottom: 10px;">
+                 
                     <h1>Manual Predictor Analysis Report</h1>
                     <p>Comprehensive Machine Learning Pipeline Results</p>
                 </header>

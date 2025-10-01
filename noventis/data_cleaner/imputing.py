@@ -138,8 +138,8 @@ class NoventisImputer:
             'missing_values_before': int(missing_before)
         }
 
-        if self.verbose:
-            self._print_summary()
+        # if self.verbose:
+        #     self._print_summary()
 
         return self
 

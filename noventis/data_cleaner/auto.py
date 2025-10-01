@@ -44,7 +44,7 @@ class NoventisDataCleaner:
                  outlier_params: dict = None,
                  encoder_params: dict = None,
                  scaler_params: dict = None,
-                 verbose: bool = True):
+                 verbose: bool = False):
         """
         Initializes the NoventisDataCleaner.
 
@@ -61,7 +61,7 @@ class NoventisDataCleaner:
         self.outlier_params = outlier_params or {}
         self.encoder_params = encoder_params or {}
         self.scaler_params = scaler_params or {}
-        self.verbose = verbose
+        self.verbose = False
 
         self.imputer_ = None
         self.outlier_handler_ = None
@@ -94,7 +94,7 @@ class NoventisDataCleaner:
 
         if self.verbose:
             print("STARTING NOVENTIS DATA CLEANER PIPELINE")
-            print("="*50)
+            # print("="*50)
 
         # Execute each step in the pipeline
         for step in self.pipeline_steps:
@@ -192,7 +192,7 @@ class NoventisDataCleaner:
             weight = self.quality_score_['weights'].get(weight_key, 0) * 100
             print(f"     - {name:<35}: {score:<10} (Weight: {weight:.0f}%)")
 
-        print("\n" + "--- PIPELINE PROCESS SUMMARY ---")
+        print("\n" + "PIPELINE PROCESS SUMMARY")
         if 'impute' in self.reports_ and self.reports_['impute']:
             imputed_count = self.reports_['impute'].get('values_imputed', 0)
             print(f"  - Imputation: Successfully filled {imputed_count} missing values.")
