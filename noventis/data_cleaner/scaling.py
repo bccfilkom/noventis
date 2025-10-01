@@ -33,7 +33,7 @@ class NoventisScaler:
                  skew_threshold: float = 2.0,
                  outlier_threshold: float = 0.01,
                  normality_alpha: float = 0.05,
-                 verbose: bool = True):
+                 verbose: bool = False):
         """
         Initializes the NoventisScaler.
 
@@ -214,12 +214,11 @@ class NoventisScaler:
 
     def _print_summary(self):
         """Print summary of scaling methods used and reasons."""
-        print("\n📋 SCALING SUMMARY\n" + "-" * 40)
+    
         method_counts = pd.Series(self.fitted_methods_).value_counts()
         for method, count in method_counts.items():
             print(f"   - {method.upper()}: {count} columns")
 
-        print("\n📊 DETAILED REPORT\n" + "-" * 40)
         for col in self.fitted_methods_:
             print(f"  Column: {col}")
             print(f"     - Method: {self.fitted_methods_[col].upper()}")

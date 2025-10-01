@@ -23,7 +23,7 @@ class NoventisOutlierHandler:
                 quantile_range: Tuple[float, float] = (0.05, 0.95),
                 min_data_threshold: int = 100,
                 skew_threshold: float = 0.5,
-                verbose: bool = True):
+                verbose: bool = False):
         """
         Initialize NoventisOutlierHandler.
 

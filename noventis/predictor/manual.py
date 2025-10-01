@@ -50,6 +50,8 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
+
+
 def get_rf_params(trial: optuna.Trial) -> Dict[str, Any]:
     return {
         'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
@@ -358,7 +360,7 @@ class ManualPredictor:
         compare: bool = False,
         explain: bool = False,
         chosen_metric: Optional[str] = None,
-        display_report: bool = False
+        display_report: bool = True
     ) -> Dict[str, Any]:
         X = df.drop(columns=[target_column])
         y = df[target_column]
@@ -785,6 +787,7 @@ class ManualPredictor:
         training_time = self.best_model_info.get('training_time_seconds', 0)
         best_params_str = str(self.best_model_info.get('best_params', 'Default'))
         
+        
         all_metrics_html = ""
         for metric_name, metric_value in self.best_model_info['metrics'].items():
             all_metrics_html += f"<div class='metric-item'><span class='metric-label'>{metric_name.replace('_', ' ').title()}</span><span class='metric-value'>{metric_value:.4f}</span></div>"
@@ -894,12 +897,22 @@ class ManualPredictor:
             msg = "Report cannot be generated. Please run the pipeline first using .run_pipeline()."
             logging.error(msg)
             return f"<p>{msg}</p>"
+        
+        logo_data_uri = "" 
+
+        path_ke_logo = "../asset/Logo.png" 
+
+        # try:
+        #     with open(path_ke_logo, "rb") as image_file:
+        #         logo_base64 = base64.b64encode(image_file.read()).decode('utf-8')
+        #         logo_data_uri = f"data:image/png;base64,{logo_base64}"
+        # except FileNotFoundError:
+        #     logging.warning(f"File logo tidak ditemukan di path: '{path_ke_logo}'. Pastikan path benar relatif dari lokasi script dijalankan.")
 
         summary_html = self._get_summary_html()
         comparison_table_html = self._get_comparison_table_html()
         plots_html = self._get_plots_html()
         
-        # Perhatikan ID unik ditambahkan di dalam template HTML dan CSS
         html_template = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -908,7 +921,6 @@ class ManualPredictor:
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Manual Predictor Report</title>
         <style>
-            /* SEMUA SELEKTOR CSS KINI DIAWALI DENGAN #manual-predictor-report UNTUK MENGISOLASI GAYA */
             @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Exo+2:wght@700&display=swap');
             #manual-predictor-report {{
                 --bg-dark-1: #0D1117; --bg-dark-2: #161B22; --border-color: #30363D;
@@ -1023,6 +1035,7 @@ class ManualPredictor:
     <body>
         <div id="manual-predictor-report"> <div class="container">
                 <header>
+                 
                     <h1>Manual Predictor Analysis Report</h1>
                     <p>Comprehensive Machine Learning Pipeline Results</p>
                 </header>
@@ -1053,7 +1066,6 @@ class ManualPredictor:
             </div>
         </div>
         <script>
-            // Fungsi JS tidak perlu diubah karena mereka sudah mencari elemen di dalam scope yang benar.
             function showTab(event, tabName) {{
                 const reportScope = document.getElementById('manual-predictor-report');
                 reportScope.querySelectorAll('.content-section').forEach(section => {{

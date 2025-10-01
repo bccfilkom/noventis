@@ -22,7 +22,7 @@ class NoventisImputer:
                 columns: Optional[List[str]] = None,
                 fill_value: Any = None,
                 n_neighbors: int = 5, 
-                verbose: bool = True):
+                verbose: bool = False):
         """
         Initialize NoventisImputer.
 

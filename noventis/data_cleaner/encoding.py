@@ -36,7 +36,7 @@ class NoventisEncoder:
                  cv: int = 5,  # Changed from cv_folds to cv
                  smooth: Union[float, str] = 'auto',
                  target_type: str = 'auto',  # Added target_type parameter
-                 verbose: bool = True):
+                 verbose: bool = False):
         """
         Initializes the Advanced NoventisEncoder.
 
