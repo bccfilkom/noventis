@@ -254,7 +254,7 @@ class NoventisScaler:
         return self.quality_report_
 
 
-    def plot_comparison(self, max_cols: int = 1):
+    def plot_comparison(self, max_cols: int = len(scalers_.keys())):
         """Plot before/after comparison of scaling results."""
         if not self.is_fitted_ or self._original_df_snapshot is None: return None
         cols_to_plot = list(self.scalers_.keys())[:max_cols]
@@ -262,42 +262,44 @@ class NoventisScaler:
 
         original_data = self._original_df_snapshot
         transformed_data = self.transform(original_data.copy())
-        col = cols_to_plot[0]
+        col = [cols_to_plot[i] for i in range(len(cols_to_plot))]
 
         color_before, color_after = '#58A6FF', '#F78166'
         bg_color, text_color = '#0D1117', '#C9D1D9'
 
-        fig, axes = plt.subplots(2, 2, figsize=(16, 12), facecolor=bg_color)
-        fig.suptitle(f"Scaling Comparison for '{col}' (Method: {self.fitted_methods_[col].upper()})",
-                     fontsize=20, color=text_color, weight='bold')
+        for i in range(len(col)):
+            fig, axes = plt.subplots(2, 2, figsize=(16, 12), facecolor=bg_color)
+            fig.suptitle(f"Scaling Comparison for '{col[i]}' (Method: {self.fitted_methods_[col[i]].upper()})",
+                        fontsize=20, color=text_color, weight='bold')
 
-        # --- BEFORE ---
-        sns.histplot(original_data[col], kde=True, ax=axes[0, 0], color=color_before)
-        axes[0, 0].set_title("Before: Distribution", color=text_color, fontsize=14)
-        stats.probplot(original_data[col].dropna(), dist="norm", plot=axes[0, 1])
-        axes[0, 1].get_lines()[0].set(color=color_before, markerfacecolor=color_before)
-        axes[0, 1].get_lines()[1].set(color='white', linestyle='--')
-        axes[0, 1].set_title("Before: Q-Q Plot vs Normal", color=text_color, fontsize=14)
+            # --- BEFORE ---
+            sns.histplot(original_data[col[i]], kde=True, ax=axes[0, 0], color=color_before)
+            axes[0, 0].set_title("Before: Distribution", color=text_color, fontsize=14)
+            stats.probplot(original_data[col[i]].dropna(), dist="norm", plot=axes[0, 1])
+            axes[0, 1].get_lines()[0].set(color=color_before, markerfacecolor=color_before)
+            axes[0, 1].get_lines()[1].set(color='white', linestyle='--')
+            axes[0, 1].set_title("Before: Q-Q Plot vs Normal", color=text_color, fontsize=14)
 
-        # --- AFTER ---
-        sns.histplot(transformed_data[col], kde=True, ax=axes[1, 0], color=color_after)
-        axes[1, 0].set_title("After: Distribution", color=text_color, fontsize=14)
-        stats.probplot(transformed_data[col].dropna(), dist="norm", plot=axes[1, 1])
-        axes[1, 1].get_lines()[0].set(color=color_after, markerfacecolor=color_after)
-        axes[1, 1].get_lines()[1].set(color='white', linestyle='--')
-        axes[1, 1].set_title("After: Q-Q Plot vs Normal", color=text_color, fontsize=14)
+            # --- AFTER ---
+            sns.histplot(transformed_data[col[i]], kde=True, ax=axes[1, 0], color=color_after)
+            axes[1, 0].set_title("After: Distribution", color=text_color, fontsize=14)
+            stats.probplot(transformed_data[col[i]].dropna(), dist="norm", plot=axes[1, 1])
+            axes[1, 1].get_lines()[0].set(color=color_after, markerfacecolor=color_after)
+            axes[1, 1].get_lines()[1].set(color='white', linestyle='--')
+            axes[1, 1].set_title("After: Q-Q Plot vs Normal", color=text_color, fontsize=14)
 
-        for ax_row in axes:
-            for ax in ax_row:
-                ax.set_facecolor(bg_color)
-                ax.tick_params(colors=text_color, which='both')
-                for spine in ax.spines.values(): spine.set_edgecolor(text_color)
-                ax.title.set_color(text_color)
-                ax.xaxis.label.set_color(text_color)
-                ax.yaxis.label.set_color(text_color)
+            for ax_row in axes:
+                for ax in ax_row:
+                    ax.set_facecolor(bg_color)
+                    ax.tick_params(colors=text_color, which='both')
+                    for spine in ax.spines.values(): spine.set_edgecolor(text_color)
+                    ax.title.set_color(text_color)
+                    ax.xaxis.label.set_color(text_color)
+                    ax.yaxis.label.set_color(text_color)
 
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-        return fig
+            plt.tight_layout(rect=[0, 0, 1, 0.95])
+            plt.show()
+        # return fig
 
     def get_summary_text(self) -> str:
         """Generates a formatted string summary for the HTML report."""
@@ -317,41 +319,3 @@ class NoventisScaler:
             </div>
         """
         return summary_html
-
-    def print_quality_report(self):
-        """Print quality report comparing before and after scaling metrics."""
-        if not self.is_fitted_:
-            print("⚠️ Scaler must be fitted first. Run .fit() or .fit_transform().")
-            return
-        
-        if self._original_df_snapshot is None:
-            print("⚠️ Original data snapshot not found. Run .fit() on your data.")
-            return
-
-        print("📊" + "="*23 + " SCALING QUALITY REPORT " + "="*23 + "📊")
-        
-        df_before = self._original_df_snapshot
-        df_after = self.transform(df_before.copy())
-
-        report_before = assess_data_quality(df_before)
-        report_after = assess_data_quality(df_after)
-        
-        order = [
-            'completeness', 'datatype_purity', 'outlier_quality', 
-            'distribution_quality'
-        ]
-
-        print(f"{'METRIC':<25} | {'BEFORE':<12} | {'AFTER':<12}")
-        print("-" * 55)
-
-        for key in order:
-            if key in report_before and key in report_after:
-                title = key.replace('_', ' ').title()
-                score_before = report_before[key]['score']
-                score_after = report_after[key]['score']
-
-                indicator = "✅" if score_after > score_before else "  "
-                
-                print(f"{title:<25} | {score_before:<12} | {score_after:<12} {indicator}")
-        
-        print("="*55)
