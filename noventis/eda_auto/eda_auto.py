@@ -814,6 +814,17 @@ class NoventisAutoEDA:
             .clean-list {{ list-style: none; padding: 0; text-align: left;}}
             .detail-header {{ margin-top: 2rem; margin-bottom: 1rem; text-align: center; }}
             .biz-details-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; width: 100%; }}
+            #{self.report_id} header {{
+                padding: 30px; background: linear-gradient(135deg, #1A2D40 0%, #0D1117 100%);
+                text-align: center; border-bottom: 2px solid var(--border-color);
+                }}
+                #{self.report_id} header h1 {{ 
+                    font-family: 'Exo 2', sans-serif; color: var(--primary-blue); 
+                    margin: 0; font-size: 2.5rem; text-shadow: 0 2px 10px rgba(88, 166, 255, 0.3); 
+                }}
+                #{self.report_id} header p {{ 
+                    margin: 10px 0 0; color: var(--text-medium); font-size: 1.1rem; 
+            }}
             
             {extended_css}
         </style>

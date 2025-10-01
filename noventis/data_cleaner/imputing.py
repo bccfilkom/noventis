@@ -22,7 +22,7 @@ class NoventisImputer:
                 columns: Optional[List[str]] = None,
                 fill_value: Any = None,
                 n_neighbors: int = 5, 
-                verbose: bool = True):
+                verbose: bool = False):
         """
         Initialize NoventisImputer.
 
@@ -138,8 +138,8 @@ class NoventisImputer:
             'missing_values_before': int(missing_before)
         }
 
-        # if self.verbose:
-        #     self._print_summary()
+        if self.verbose:
+            self._print_summary()
 
         return self
 
