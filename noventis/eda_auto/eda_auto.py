@@ -689,11 +689,15 @@ class NoventisAutoEDA:
     
     def generate_html_report(self, report_height: int, show_base_viz: bool) -> HTML:
         tabs_config = []; report_title = "Noventis Automated EDA Report"
-        if self.personality in ['business', 'all']:
+        if self.personality in ['business']:
             report_title = "Noventis Business Intelligence Report"
             tabs_config.append({'id': 'business_impact', 'title': 'Business Impact', 'content_func': self._generate_business_impact_dashboard})
-        if self.personality in ['academic', 'all']:
+        if self.personality in ['academic']:
             report_title = "Noventis Academic Diagnostic Dashboard"
+            tabs_config.append({'id': 'academic_diag', 'title': 'Statistical Validation', 'content_func': self._generate_academic_dashboard})
+        if self.personality in ['all']:
+            report_title = "Noventis Powerfull Report"
+            tabs_config.append({'id': 'business_impact', 'title': 'Business Impact', 'content_func': self._generate_business_impact_dashboard})
             tabs_config.append({'id': 'academic_diag', 'title': 'Statistical Validation', 'content_func': self._generate_academic_dashboard})
         if show_base_viz:
             base_tabs = [
