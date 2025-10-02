@@ -138,6 +138,60 @@ Explore practical examples and tutorials:
 
 ---
 
+# 📂 Project Structure
+The folder structure of **Noventis** project:
+
+```bash
+.
+├── 📁 dataset_for_examples/
+├── 📁 docs/
+├── 📁 examples/
+├── 📁 noventis/
+│   ├── 📁 __pycache__/
+│   ├── 📁 asset/
+│   ├── 📁 core/
+│   ├── 📁 data_cleaner/
+│   │   ├── 📄 __init__.py
+│   │   ├── 📄 auto.py
+│   │   ├── 📄 data_quality.py
+│   │   ├── 📄 encoding.py
+│   │   ├── 📄 imputing.py
+│   │   ├── 📄 outlier_handling.py
+│   │   └── 📄 scaling.py
+│   ├── 📁 eda_auto/
+│   │   ├── 📄 __init__.py
+│   │   └── 📄 eda_auto.py
+│   ├── 📁 predictor/
+│   │   ├── 📄 __init__.py
+│   │   ├── 📄 auto.py
+│   │   └── 📄 manual.py
+│   └── 📄 __init__.py
+├── 📁 noventis.egg-info/
+│   ├── 📄 dependency_links.txt
+│   ├── 📄 PKG-INFO
+│   ├── 📄 SOURCES.txt
+│   └── 📄 top_level.txt
+├── 📁 tests/
+├── 📄 .gitignore
+├── 📄 LICENSE
+├── 📄 project_folder.txt
+├── 📄 pyproject.toml
+├── 📄 README.md
+├── 📄 requirement.txt
+└── 📄 setup.py
+
+```
+
+## 📌 Notes
+- The `noventis/` folder contains the **main library code**.  
+- The `tests/` folder is dedicated to **unit testing and integration testing**.  
+- `setup.py` and `pyproject.toml` are used for **packaging and distribution**.  
+- `requirement.txt` lists the **external dependencies** needed for the project.  
+
+🚀 With this structure, the project is ready for development, testing, and publishing on **PyPI or GitHub**.  
+
+---
+
 
 ## 📄 License
 
