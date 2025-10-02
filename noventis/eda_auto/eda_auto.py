@@ -828,7 +828,10 @@ class NoventisAutoEDA:
             
             {extended_css}
         </style>
-        </head><body><div id="{self.report_id}" class="report-frame"><div class="container">
+        </head>
+        <body>
+        <div id="{self.report_id}" class="report-frame">
+        <div class="container">
             <header><h1>{report_title}</h1><p>A comprehensive overview of the dataset's characteristics.</p></header>
             <nav class="navbar">{navbar_html}</nav>
             <main>{main_content_html}</main>

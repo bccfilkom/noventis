@@ -2,7 +2,7 @@
 /noventis.data_cleaner/__pycache__
 
 # Folder cache Python
-__pycache__/
+*__pycache__/
 *.pyc
 *.pyo
 *.pyd
