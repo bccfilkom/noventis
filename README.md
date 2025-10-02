@@ -121,7 +121,7 @@ Automated machine learning with intelligent model selection:
 - **Model Explainability** - SHAP values and feature importance analysis
 - **Ensemble Methods** - Combines multiple models for better performance
 
-[Learn more →](docs/predictor.md)
+[Learn more →](docs/auto.md)
 
 ---
 
