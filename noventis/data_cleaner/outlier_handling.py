@@ -117,7 +117,8 @@ class NoventisOutlierHandler:
             raise RuntimeError("Handler must be fitted before transform.")
         
         df_out = X.copy()
-
+        count_above_bound = 0
+        count_below_bound = 0
         for col, method in self.methods_.items():
             # Robustness check if column doesn't exist in transform data
             if col not in df_out.columns: 
@@ -125,6 +126,8 @@ class NoventisOutlierHandler:
             
             if method == 'winsorize':
                 lower_bound, upper_bound = self.boundaries_[col]
+                count_above_bound+=(df_out[col] > upper_bound).sum()
+                count_below_bound+=(df_out[col] < lower_bound).sum()
                 df_out[col] = np.clip(df_out[col], lower_bound, upper_bound)
 
         if self.indices_to_drop_:
@@ -134,7 +137,7 @@ class NoventisOutlierHandler:
             
         rows_before = len(X)
         rows_after = len(df_out)
-        outliers_removed = rows_before - rows_after
+        outliers_removed = rows_before - rows_after + count_above_bound + count_below_bound
         removal_percentage = (outliers_removed / rows_before * 100) if rows_before > 0 else 0
 
         self.quality_report_ = {
