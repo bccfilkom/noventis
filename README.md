@@ -12,7 +12,7 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[Website](https://noventis.dev) • [Documentation](https://docs.noventis.dev) • [Discord](https://discord.gg/noventis)
+[Website](https://noventis.dev) • [Documentation](https://docs.noventis.dev)
 
 
 <img width="1247" height="637" alt="Screenshot From 2025-10-02 09-44-31" src="https://github.com/user-attachments/assets/264f13ce-4f5a-477a-a89d-73f0c9a585bd" />
