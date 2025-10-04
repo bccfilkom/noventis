@@ -125,18 +125,6 @@ Automated machine learning with intelligent model selection:
 
 ---
 
-## 📖 Examples
-
-Explore practical examples and tutorials:
-
-- [Basic Data Cleaning Pipeline](examples/basic_cleaning.md)
-- [Automated EDA Report](examples/automated_eda.md)
-- [Building ML Models](examples/building_models.md)
-- [End-to-End Data Science Workflow](examples/complete_pipeline.md)
-- [Advanced Feature Engineering](examples/feature_engineering.md)
-- [Custom Model Configuration](examples/custom_config.md)
-
----
 
 ## 👥 Contributors
 
