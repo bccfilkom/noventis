@@ -202,8 +202,8 @@ class NoventisDataCleaner:
             print(f"  - Imputation: Successfully filled {imputed_count} missing values.")
         if 'outlier' in self.reports_ and self.reports_['outlier']:
             removed_count = self.reports_['outlier'].get('outliers_removed', 0)
-            print(self.reports_['outlier']['outliers_removed'])
-            print(f"  - Outliers: Removed {removed_count} rows identified as outliers.")
+            winsorized_count = self.reports_['outlier'].get('outliers_winsorized', 0)
+            print(f"  - Outliers: Removed {removed_count} rows and winsorized {winsorized_count} rows identified as outliers.")
         if 'encode' in self.reports_ and self.reports_['encode']:
             summary = self.reports_['encode'].get('overall_summary', {})
             encoded_cols = summary.get('total_columns_encoded', 0)
@@ -302,6 +302,10 @@ class NoventisDataCleaner:
                     <div class="stat-row">
                         <span class="stat-label">Outliers Removed:</span>
                         <span class="stat-value">{self.reports_.get('outlier', {}).get('outliers_removed', 'N/A')}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Outliers Winsorized:</span>
+                        <span class="stat-value">{self.reports_.get('outlier', {}).get('outliers_winsorized', 'N/A')}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Features Encoded:</span>

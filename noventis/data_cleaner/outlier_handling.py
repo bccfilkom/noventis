@@ -137,14 +137,16 @@ class NoventisOutlierHandler:
             
         rows_before = len(X)
         rows_after = len(df_out)
-        outliers_removed = rows_before - rows_after + count_above_bound + count_below_bound
+        outliers_removed = rows_before - rows_after
+        outliers_winsorized = count_above_bound + count_below_bound
         removal_percentage = (outliers_removed / rows_before * 100) if rows_before > 0 else 0
 
         self.quality_report_ = {
             'rows_before': rows_before,
             'rows_after': rows_after,
             'outliers_removed': outliers_removed,
-            'removal_percentage': f"{removal_percentage:.2f}%"
+            'removal_percentage': f"{removal_percentage:.2f}%",
+            'outliers_winsorized': outliers_winsorized
         }
         return df_out
 
@@ -170,7 +172,8 @@ class NoventisOutlierHandler:
         
         print("\n📋" + "="*23 + " OUTLIER HANDLING SUMMARY " + "="*23 + "📋")
         print(f"{'Method':<25} | {self.default_method.upper() if self.default_method == 'auto' else 'CUSTOM MAP'}")
-        print(f"{'Total Rows Removed':<25} | {summary.get('outliers_removed (rows)', 'N/A')}")
+        print(f"{'Total Rows Removed':<25} | {summary.get('outliers_removed', 'N/A')}")
+        print(f"{'Total Rows winsorized':<25} | {summary.get('outliers_winsorized', 'N/A')}")
         print(f"{'Data Retained Score':<25} | {summary.get('data_retained_score', 'N/A')}")
         print("="*72)
     
@@ -187,6 +190,7 @@ class NoventisOutlierHandler:
                 <p><b>Rows Before:</b> {report.get('rows_before', 0)}</p>
                 <p><b>Rows After:</b> {report.get('rows_after', 0)}</p>
                 <p><b>Outlier Rows Removed:</b> {report.get('outliers_removed', 0)}</p>
+                <p><b>Outlier Rows Winsorized:</b> {report.get('outliers_winsorized', 0)}</p>
             </div>
             <div class="grid-item">
                 <h4>Methodology per Column</h4>
