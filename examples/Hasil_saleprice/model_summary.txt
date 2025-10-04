@@ -1,0 +1,12 @@
+======================================================================
+         NOVENTIS AutoML - MODEL SUMMARY
+======================================================================
+
+Task Type: Regression
+Best Model: Catboost
+Target Column: SalePrice
+Dataset Shape: (2930, 82)
+Train/Test Split: 2344/586
+
+PERFORMANCE METRICS:
+----------------------------------------

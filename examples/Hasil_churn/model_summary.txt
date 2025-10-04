@@ -1,0 +1,12 @@
+======================================================================
+         NOVENTIS AutoML - MODEL SUMMARY
+======================================================================
+
+Task Type: Classification
+Best Model: Lightgbm
+Target Column: churn
+Dataset Shape: (500, 16)
+Train/Test Split: 400/100
+
+PERFORMANCE METRICS:
+----------------------------------------

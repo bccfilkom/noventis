@@ -1,7 +1,7 @@
 from .auto import NoventisAutoML
-from .manual import ManualPredictor
+from .manual import NoventisManualPredictor
 
 __all__ = [
     'NoventisAutoML',
-    'ManualPredictor'
+    'NoventisManualPredictor'
 ]

@@ -253,10 +253,16 @@ class NoventisScaler:
         return self.quality_report_
 
 
+<<<<<<< Updated upstream
     def plot_comparison(self, max_cols: int = None):
         """Plot before/after comparison of scaling results."""
         if max_cols is None:
             max_cols = len(self.scalers_.keys)
+=======
+    def plot_comparison(self, max_cols: Optional[int] = None):
+        if max_cols is None:
+            max_cols = len(self.scalers_.keys())
+>>>>>>> Stashed changes
         if not self.is_fitted_ or self._original_df_snapshot is None: return None
         cols_to_plot = list(self.scalers_.keys())[:max_cols]
         if not cols_to_plot: return None

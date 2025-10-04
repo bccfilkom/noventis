@@ -153,7 +153,7 @@ MODEL_CONFIG = {
 }
 
 
-class ManualPredictor:
+class NoventisManualPredictor:
     def __init__(
         self,
         model_name: Union[str, List[str]],

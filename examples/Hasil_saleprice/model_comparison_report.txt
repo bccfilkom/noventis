@@ -1,0 +1,66 @@
+================================================================================
+         NOVENTIS AutoML - MODEL COMPARISON REPORT
+================================================================================
+
+Task Type: Regression
+Primary Metric: r2_score
+Best Model: Catboost
+
+MODEL RANKINGS:
+------------------------------------------------------------
+
+1. Catboost
+   Primary Score (r2_score): 0.9401
+   All Metrics:
+     • Mae: 13209.1311
+     • Mse: 480360421.0681
+     • Rmse: 21917.1262
+     • R2 Score: 0.9401
+
+2. Automl
+   Primary Score (r2_score): 0.9266
+   All Metrics:
+     • Mae: 14765.8812
+     • Mse: 588626904.0550
+     • Rmse: 24261.6344
+     • R2 Score: 0.9266
+
+3. Xgboost
+   Primary Score (r2_score): 0.9205
+   All Metrics:
+     • Mae: 15534.5527
+     • Mse: 637220160.0000
+     • Rmse: 25243.2201
+     • R2 Score: 0.9205
+
+4. Gradient Boosting
+   Primary Score (r2_score): 0.9124
+   All Metrics:
+     • Mae: 15236.4893
+     • Mse: 702463406.5768
+     • Rmse: 26504.0262
+     • R2 Score: 0.9124
+
+5. Random Forest
+   Primary Score (r2_score): 0.9119
+   All Metrics:
+     • Mae: 15893.4273
+     • Mse: 706332512.0799
+     • Rmse: 26576.9169
+     • R2 Score: 0.9119
+
+6. Lightgbm
+   Primary Score (r2_score): 0.9116
+   All Metrics:
+     • Mae: 15162.7632
+     • Mse: 708400851.2430
+     • Rmse: 26615.8008
+     • R2 Score: 0.9116
+
+7. Linear Regression
+   Primary Score (r2_score): 0.7365
+   All Metrics:
+     • Mae: 29685.1470
+     • Mse: 2112265716.1784
+     • Rmse: 45959.3920
+     • R2 Score: 0.7365

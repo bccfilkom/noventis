@@ -1,0 +1,10 @@
+include README.md
+include LICENSE
+
+recursive-include dataset_for_examples *
+
+recursive-include docs *
+recursive-include examples *
+
+global-exclude *.pyc
+global-exclude __pycache__/

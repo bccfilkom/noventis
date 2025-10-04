@@ -1,18 +1,79 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "noventis"
 version = "0.1.0"
-authors = [
-  { name="Nama Anda", email="email@anda.com" },
-]
-description = "A custom data cleaning library."
+description = "A Python library for data cleaning, exploratory data analysis, and machine learning utilities"
 readme = "README.md"
 requires-python = ">=3.8"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+license = { file = "LICENSE" }
+
+authors = [
+  { name = "Ahmad Nafi Mubarok", email = "youremail@example.com" }
 ]
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Operating System :: OS Independent"
+]
+
+keywords = ["machine-learning", "data-cleaning", "eda", "utils"]
+
+dependencies = [
+  "numpy>=1.20",
+  "pandas>=1.3",
+  "scikit-learn>=1.0",
+  "matplotlib>=3.4",
+  "seaborn>=0.11"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=6.0",
+  "black",
+  "flake8",
+  "mypy"
+]
+docs = [
+  "sphinx",
+  "sphinx-rtd-theme"
+]
+
+[project.urls]
+Homepage = "https://github.com/username/noventis"
+Repository = "https://github.com/username/noventis"
+Issues = "https://github.com/username/noventis/issues"
+Documentation = "https://your-docs-link-here.com"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["noventis*"]
+exclude = ["tests*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "noventis.__version__" }
+
+[tool.black]
+line-length = 88
+target-version = ["py38"]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.8"
+strict = true
