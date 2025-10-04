@@ -403,10 +403,12 @@ class NoventisEncoder:
         summary_lines.append("</ul>")
 
         summary_lines.append("<h4>Detailed Analysis</h4><ul>")
-        for col, method in self.learned_cols.items():
+        sorted_col = sorted(self.column_info.items(), key=lambda item:item[1].get('correlation_with_target', 0), reverse=True)
+        print(sorted_col)
+        for col, _ in sorted_col:
             info = self.column_info.get(col, {})
             corr_text = f" | Correlation: {info.get('correlation_with_target', 0):.3f}" if self.method == 'auto' else ""
-            summary_lines.append(f"<li><b>{col}:</b> Method '{method.upper()}' (Unique Values: {info.get('unique_count', 'N/A')}{corr_text})</li>")
+            summary_lines.append(f"<li><b>{col}:</b> Method '{self.learned_cols[col].upper()}' (Unique Values: {info.get('unique_count', 'N/A')}{corr_text})</li>")
         summary_lines.append("</ul>")
         
         return "".join(summary_lines)
