@@ -260,9 +260,9 @@ class NoventisAutoML:
         Returns:
             Dictionary containing all results, metrics, and model information
         """
-        print("\n" + "="*60)
+
         print("Starting NoventisAutoML Training Process")
-        print("="*60)
+       
         
         # Use instance time_budget if not overridden
         time_budget = time_budget or self.time_budget
@@ -289,10 +289,10 @@ class NoventisAutoML:
         if self.explain:
             self._generate_explanations()
         
-        print("\n" + "="*60)
+
         print("✓ Training completed successfully!")
         print(f"✓ Results saved to: {self.output_dir}")
-        print("="*60 + "\n")
+  
         
         return self.results
 
@@ -367,7 +367,7 @@ class NoventisAutoML:
         predictor = NoventisManualPredictor(
             model_name=self.model_list, 
             task=self.task_type, 
-            random_state=self.random_state
+            random_state=self.random_state,
         )
         
         # Run training pipeline

@@ -3,10 +3,38 @@
 ======================================================================
 
 Task Type: Classification
-Best Model: Lightgbm
+Best Model: AutoML
 Target Column: churn
 Dataset Shape: (500, 16)
 Train/Test Split: 400/100
 
 PERFORMANCE METRICS:
 ----------------------------------------
+  Accuracy: 0.8800
+  Precision: 0.8823
+  Recall: 0.8800
+  F1 Score: 0.8796
+
+TOP 10 IMPORTANT FEATURES:
+----------------------------------------
+  feature_4: 52.0000
+  feature_0: 41.0000
+  feature_14: 36.0000
+  feature_3: 35.0000
+  feature_10: 31.0000
+  feature_2: 30.0000
+  feature_12: 24.0000
+  feature_7: 23.0000
+  feature_11: 18.0000
+  feature_8: 17.0000
+
+MODEL CONFIGURATION:
+----------------------------------------
+  n_estimators: 14
+  num_leaves: 27
+  min_child_samples: 4
+  learning_rate: 0.16561579048273134
+  log_max_bin: 9
+  colsample_bytree: 0.7155773335553121
+  reg_alpha: 0.003062317709146919
+  reg_lambda: 0.06548476030038436
