@@ -138,6 +138,24 @@ Explore practical examples and tutorials:
 
 ---
 
+## 👥 Contributors
+
+This project exists thanks to all the people who contribute:
+
+| Contributor | Role |
+|------------|------|
+| **Orie Abyan Maulana** | Data Analyst |
+| **Grace Wahyuni** | Data Analyst |
+| **Ahmad Nafi M.** | Data Scientist |
+| **Alexander Angelo** | Data Scientist |
+| **Rimba Nevada** | Data Scientist |
+| **Jason Surya Winata** | Frontend Engineer |
+| **Daffa** | Product Designer |
+
+We welcome contributions from the community! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
 # 📂 Project Structure
 The folder structure of **Noventis** project:
 
