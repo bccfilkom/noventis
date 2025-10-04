@@ -21,3 +21,48 @@ build/
 .vscode/
 .idea/
 *.DS_Store__pycache__/
+
+# Folder cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Folder lingkungan virtual
+.venv/
+venv/
+env/
+# Folder hasil build dan distribusi
+dist/
+build/
+*.egg-info/
+# File-file spesifik editor/OS
+.vscode/
+.idea/
+*.DS_Store
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+# Logs
+logs/
+*.log
+# Temporary files
+tmp/
+temp/
+*.tmp
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+# pytest cache
+.pytest_cache/
+# mypy cache
+.mypy_cache/
+.dmypy.json
+# Pyre type checker cache
+.pyre/
+# Cython debug symbols
+cython_debug/
+# Environment variables file
+
+
+*.pkl
