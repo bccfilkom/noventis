@@ -132,6 +132,7 @@ class NoventisDataCleaner:
         dist_improvement = final_dist - initial_dist
         scores['distribution'] = min(100, max(0, final_dist + (dist_improvement * 0.5)))
         
+        
         # 4. Feature Engineering Quality (10%) - Reward useful encoding
         if 'encode' in self.reports_ and self.reports_['encode']:
             report = self.reports_['encode'].get('overall_summary', {})
@@ -197,43 +198,11 @@ class NoventisDataCleaner:
 
         print("\n" + "PIPELINE PROCESS SUMMARY")
         if 'impute' in self.reports_ and self.reports_['impute']:
-            imputed_count = self.reports_['impute'].get('values_imputed', 0)
+            imputed_count = self.reports_['impute'].get('overall_summary', {}).get('total_values_imputed', 0)
             print(f"  - Imputation: Successfully filled {imputed_count} missing values.")
         if 'outlier' in self.reports_ and self.reports_['outlier']:
             removed_count = self.reports_['outlier'].get('outliers_removed', 0)
-            print(f"  - Outliers: Removed {removed_count} rows identified as outliers.")
-        if 'encode' in self.reports_ and self.reports_['encode']:
-            summary = self.reports_['encode'].get('overall_summary', {})
-            encoded_cols = summary.get('total_columns_encoded', 0)
-            new_features = summary.get('total_features_created', 0)
-            print(f"  - Encoding: Transformed {encoded_cols} categorical columns into {new_features} new features.")
-        if 'scale' in self.reports_ and self.reports_['scale']:
-            scaled_cols = len(self.reports_['scale'].get('column_details', {}))
-            print(f"  - Scaling: Standardized the scale for {scaled_cols} numerical columns.")
-
-        print("\n" + "="*65)
-
-    def display_summary_report(self):
-        """Displays the comprehensive final summary report in the console."""
-        if not self.is_fitted_:
-            print("Cleaner has not been run. Execute .fit_transform() first.")
-            return
-
-        print("\n" + "="*22 + " DATA QUALITY REPORT " + "="*22)
-        print(f"  Final Quality Score: {self.quality_score_['final_score']}")
-        for name, score in self.quality_score_['details'].items():
-            weight_key = name.split(' ')[0].lower()
-            if weight_key == 'feature':
-                weight_key = 'feature_engineering'
-            weight = self.quality_score_['weights'].get(weight_key, 0) * 100
-            print(f"     - {name:<35}: {score:<10} (Weight: {weight:.0f}%)")
-
-        print("\n" + "PIPELINE PROCESS SUMMARY")
-        if 'impute' in self.reports_ and self.reports_['impute']:
-            imputed_count = self.reports_['impute'].get('values_imputed', 0)
-            print(f"  - Imputation: Successfully filled {imputed_count} missing values.")
-        if 'outlier' in self.reports_ and self.reports_['outlier']:
-            removed_count = self.reports_['outlier'].get('outliers_removed', 0)
+            print(self.reports_['outlier']['outliers_removed'])
             print(f"  - Outliers: Removed {removed_count} rows identified as outliers.")
         if 'encode' in self.reports_ and self.reports_['encode']:
             summary = self.reports_['encode'].get('overall_summary', {})
@@ -328,7 +297,7 @@ class NoventisDataCleaner:
                     <h4>Processing Summary</h4>
                     <div class="stat-row">
                         <span class="stat-label">Imputed Values:</span>
-                        <span class="stat-value">{self.reports_.get('impute', {}).get('values_imputed', 'N/A')}</span>
+                        <span class="stat-value">{self.reports_.get('impute', {}).get('overall_summary').get('total_values_imputed', 'N/A')}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Outliers Removed:</span>
