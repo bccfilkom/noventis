@@ -16,14 +16,23 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 import warnings
 warnings.filterwarnings('ignore')
 
-# --- Helper Function ---
 def plot_to_base64(fig):
+    """
+    Converts a Matplotlib figure to a Base64-encoded string for HTML embedding.
+    
+    Args:
+        fig (matplotlib.figure.Figure or None): The Matplotlib figure object to convert.
+            If None, returns an empty string.
+    
+    Returns:
+        str: Base64-encoded PNG image string with data URI prefix,
+             or empty string if fig is None.
+    """
     if fig is None: return ""
     buf = io.BytesIO(); fig.savefig(buf, format='png', bbox_inches='tight', facecolor=fig.get_facecolor()); buf.seek(0)
     img_str = base64.b64encode(buf.read()).decode('utf-8'); buf.close(); plt.close(fig)
     return f"data:image/png;base64,{img_str}"
 
-# --- Tema Plot Standar Tunggal (Gelap) ---
 plt.rcParams.update({
     'font.size': 12, 'axes.labelsize': 10, 'xtick.labelsize': 8, 'ytick.labelsize': 8, 'axes.titlesize': 12, 
     'figure.titlesize': 14, 'legend.fontsize': 10, 'figure.facecolor': '#161B22', 'axes.facecolor': '#161B22', 
@@ -32,7 +41,46 @@ plt.rcParams.update({
 })
 
 class NoventisAutoEDA:
+    """
+    Automated Exploratory Data Analysis (EDA) tool with multiple personality modes.
+    Generates comprehensive HTML reports with interactive visualizations.
+    """
+    
     def __init__(self, data: Union[pd.DataFrame, str], target: str = None, personality: str = 'default'):
+        """
+        Initializes the NoventisAutoEDA analyzer.
+        
+        Args:
+            data (Union[pd.DataFrame, str]): Input data source.
+                Can be either:
+                - A pandas DataFrame object
+                - A string path to a CSV file
+            target (str, optional): Name of the target variable column.
+                Used for target analysis and correlation studies.
+                Defaults to None.
+            personality (str, optional): Analysis personality/mode.
+                Available options:
+                - 'default': Standard EDA visualizations
+                - 'academic': Adds statistical tests (Shapiro-Wilk, VIF, model diagnostics)
+                - 'business': Adds business metrics (ROI, customer intelligence, priority matrix)
+                - 'all': Combines both academic and business features
+                Defaults to 'default'.
+        
+        Raises:
+            FileNotFoundError: If the CSV file path does not exist.
+            TypeError: If data is neither a DataFrame nor a valid file path string.
+            ValueError: If personality is not one of the allowed values.
+            ValueError: If target column is specified but not found in the DataFrame.
+        
+        Attributes:
+            df (pd.DataFrame): The loaded DataFrame.
+            target (str): The target column name.
+            personality (str): The selected analysis mode.
+            numeric_cols_ (list): List of numeric column names.
+            categorical_cols_ (list): List of categorical column names.
+            report_id (str): Unique identifier for the HTML report.
+            CORRELATION_COL_THRESHOLD (int): Threshold for correlation matrix display mode.
+        """
         if isinstance(data, str):
             try: df = pd.read_csv(data)
             except FileNotFoundError: raise FileNotFoundError(f"File tidak ditemukan di '{data}'")
@@ -50,6 +98,12 @@ class NoventisAutoEDA:
         self.CORRELATION_COL_THRESHOLD = 30
     
     def _count_total_outliers(self):
+        """
+        Counts total outliers across all numeric columns using IQR method.
+        
+        Returns:
+            int: Total number of outlier data points detected.
+        """
         total_outliers = 0
         for col in self.numeric_cols_:
             Q1, Q3 = self.df[col].quantile(0.25), self.df[col].quantile(0.75); IQR = Q3 - Q1
@@ -58,6 +112,14 @@ class NoventisAutoEDA:
         return total_outliers
 
     def _find_most_impactful_categorical(self):
+        """
+        Identifies the categorical variable with the highest impact on the numeric target.
+        Uses ANOVA F-statistic to measure relationship strength.
+        
+        Returns:
+            str or None: Name of the most impactful categorical column,
+                        or None if no suitable categorical variable found.
+        """
         if not self.target or self.target not in self.numeric_cols_ or not self.categorical_cols_: return self.categorical_cols_[0] if self.categorical_cols_ else None
         f_values = {}
         for col in self.categorical_cols_:
@@ -71,6 +133,20 @@ class NoventisAutoEDA:
         return max(f_values, key=f_values.get) if f_values else (self.categorical_cols_[0] if self.categorical_cols_ else None)
 
     def _business_panel_data_quality_roi(self) -> str:
+        """
+        Generates business-focused data quality ROI dashboard panel.
+        
+        Creates a comprehensive quality assessment with:
+        - Overall quality score gauge (0-100%)
+        - Missing data statistics
+        - Outlier detection summary
+        - Duplicate row counts
+        - Top 5 columns with missing values (bar chart)
+        - Top 5 columns with outliers (bar chart)
+        
+        Returns:
+            str: HTML string containing the complete ROI dashboard panel.
+        """
         missing_cells = self.df.isnull().sum().sum(); missing_pct = (missing_cells / self.df.size) * 100
         outliers_count = self._count_total_outliers(); duplicates_count = self.df.duplicated().sum()
         quality_score = max(0, 100 - (missing_pct * 1.5) - (duplicates_count / len(self.df) * 100) - (outliers_count / self.df.size * 100 * 2.0))
@@ -87,7 +163,7 @@ class NoventisAutoEDA:
         if not top_missing.empty:
             fig_miss, ax_miss = plt.subplots(figsize=(8, 4)); sns.barplot(x=top_missing.values, y=top_missing.index, ax=ax_miss, color='#58A6FF', orient='h')
             ax_miss.set_title('Top 5 Columns with Missing Data', fontsize=12); ax_miss.set_xlabel('Percentage Missing (%)', fontsize=10)
-            ax_miss.tick_params(axis='x', labelsize=10); ax_miss.tick_params(axis='y', labelsize=10) # PERBAIKAN FONT
+            ax_miss.tick_params(axis='x', labelsize=10); ax_miss.tick_params(axis='y', labelsize=10)
             missing_plot_html = plot_to_base64(fig_miss)
         
         outlier_counts = {}
@@ -100,7 +176,7 @@ class NoventisAutoEDA:
         if not top_outliers.empty:
             fig_out, ax_out = plt.subplots(figsize=(8, 4)); sns.barplot(x=top_outliers.values, y=top_outliers.index, ax=ax_out, color='#F78166', orient='h')
             ax_out.set_title('Top 5 Columns with Most Outliers', fontsize=12); ax_out.set_xlabel('Number of Outliers', fontsize=10)
-            ax_out.tick_params(axis='x', labelsize=10); ax_out.tick_params(axis='y', labelsize=10) # PERBAIKAN FONT
+            ax_out.tick_params(axis='x', labelsize=10); ax_out.tick_params(axis='y', labelsize=10)
             outlier_plot_html = plot_to_base64(fig_out)
         
         bottom_section_html = f"""
@@ -113,6 +189,18 @@ class NoventisAutoEDA:
         return top_section_html + bottom_section_html
 
     def _business_panel_customer_intelligence(self) -> str:
+        """
+        Generates customer intelligence panel showing segment impact analysis.
+        
+        Creates a pie chart visualization showing how different customer segments
+        contribute to the target variable (e.g., revenue, sales).
+        
+        Returns:
+            str: HTML string containing the customer intelligence panel with:
+                - Pie chart of top 5 segments by impact
+                - Summary table of impact values
+                - Placeholder message if requirements not met
+        """
         if not self.target or self.target not in self.numeric_cols_ or not self.categorical_cols_: return "<div class='biz-panel-placeholder'><h4>Customer Intelligence</h4><p>Requires a numeric target and categorical features.</p></div>"
         segment_col = self._find_most_impactful_categorical()
         if not segment_col: return "<div class='biz-panel-placeholder'><h4>Customer Intelligence</h4><p>No suitable categorical feature found for segmentation.</p></div>"
@@ -125,6 +213,18 @@ class NoventisAutoEDA:
         return f"<div class='biz-panel'><img src='{plot_b64}'>{summary_html}</div>"
 
     def _business_panel_priority_matrix(self) -> str:
+        """
+        Generates priority matrix showing feature impact vs. data quality.
+        
+        Creates a 2x2 matrix categorizing features into quadrants:
+        - Focus Here: High impact, high quality
+        - Strategic Fix: High impact, low quality
+        - Easy Win: Low impact, high quality
+        - Low Priority: Low impact, low quality
+        
+        Returns:
+            str: HTML string containing styled table with priority classifications.
+        """
         if not self.target or self.target not in self.numeric_cols_ or len(self.numeric_cols_) < 2: return "<div class='biz-panel-placeholder'><h4>Priority Matrix</h4><p>Requires a numeric target to analyze feature impact.</p></div>"
         impact = self.df[self.numeric_cols_].corrwith(self.df[self.target]).abs().drop(self.target, errors='ignore')
         quality = (1 - self.df[self.numeric_cols_].isnull().sum() / len(self.df)) * 100
@@ -146,12 +246,32 @@ class NoventisAutoEDA:
         return f"<div class='table-scroll-wrapper' style='max-height: 500px;'>{table_html}</div>"
 
     def _generate_business_impact_dashboard(self) -> str:
+        """
+        Generates complete business impact dashboard combining all business panels.
+        
+        Returns:
+            str: HTML string containing three-panel business dashboard:
+                - Data Quality ROI panel
+                - Customer Intelligence panel
+                - Priority Matrix panel
+        """
         panel1 = self._business_panel_data_quality_roi()
         panel2 = self._business_panel_customer_intelligence()
         panel3 = self._business_panel_priority_matrix()
         return f"""<div class="biz-dashboard-grid"><div class="grid-item"><h2>Data Quality ROI</h2>{panel1}</div><div class="grid-item"><h2>Customer Intelligence</h2>{panel2}</div><div class="grid-item"><h2>Priority Matrix</h2>{panel3}</div></div>"""
         
     def _generate_overview(self) -> str:
+        """
+        Generates dataset overview section with basic statistics.
+        
+        Returns:
+            str: HTML string containing:
+                - Dataset shape (rows, columns)
+                - Column type distribution (numeric, categorical)
+                - Memory usage
+                - Data quality warnings (academic mode only)
+                - Data preview (first 5 rows)
+        """
         base_html = f"""<div class="grid-container"><div class="grid-item"><h4>Dataset Shape</h4><p><b>Rows:</b> {self.df.shape[0]:,}</p><p><b>Columns:</b> {self.df.shape[1]}</p></div><div class="grid-item"><h4>Column Types</h4><p><b>Numeric:</b> {len(self.numeric_cols_)}</p><p><b>Categorical:</b> {len(self.categorical_cols_)}</p></div><div class="grid-item"><h4>Memory Usage</h4><p>{(self.df.memory_usage(deep=True).sum() / 1024**2):.2f} MB</p></div></div>"""
         if self.personality == 'academic':
             high_cardinality = [col for col in self.categorical_cols_ if self.df[col].nunique() > 50]; constant_cols = [col for col in self.df.columns if self.df[col].nunique() == 1]
@@ -160,6 +280,16 @@ class NoventisAutoEDA:
         return base_html + preview_html
 
     def _generate_descriptive_stats(self) -> str:
+        """
+        Generates descriptive statistics table for all columns.
+        
+        Returns:
+            str: HTML string containing comprehensive descriptive statistics.
+                Academic mode includes additional metrics (variance, skewness, kurtosis).
+        
+        Note:
+            Returns error message if statistics cannot be computed.
+        """
         try:
             stats_df = self.df.describe(include='all').transpose()
             if self.personality == 'academic' and len(self.numeric_cols_) > 0:
@@ -168,6 +298,16 @@ class NoventisAutoEDA:
         except Exception as e: return f"<p>Could not generate descriptive statistics: {e}</p>"
 
     def _analyze_missing_values(self) -> str:
+        """
+        Analyzes and visualizes missing value patterns.
+        
+        Returns:
+            str: HTML string containing:
+                - Summary table of missing values per column
+                - Missing value percentages
+                - Heatmap visualization of missing patterns
+                - Message if no missing values found
+        """
         missing_counts = self.df.isnull().sum()
         if missing_counts.sum() == 0: return "<p>No missing values found.</p>"
         missing_percentage = (missing_counts / len(self.df)) * 100; missing_df = pd.DataFrame({'missing_count': missing_counts, 'missing_percentage': missing_percentage})
@@ -178,6 +318,16 @@ class NoventisAutoEDA:
         return f"<h3>Summary</h3>{summary_html}<h3>Pattern</h3><div class='plot-container'><img src='{plot_b64}'></div>"
 
     def _analyze_outliers(self) -> str:
+        """
+        Detects and visualizes outliers using IQR method.
+        
+        Returns:
+            str: HTML string containing:
+                - Boxplot for each numeric column with outliers
+                - Outlier count and percentage
+                - IQR bounds (lower and upper)
+                - Message if no outliers detected
+        """
         if not self.numeric_cols_: return "<p>No numeric columns to analyze for outliers.</p>"
         all_panels_html = ""; outlier_found = False
         for col in self.numeric_cols_:
@@ -192,6 +342,16 @@ class NoventisAutoEDA:
         return all_panels_html
 
     def _analyze_numerical_distributions(self) -> str:
+        """
+        Analyzes and visualizes distributions of numeric variables.
+        
+        Returns:
+            str: HTML string containing for each numeric column:
+                - Histogram with KDE overlay
+                - Skewness value and classification (Normal/Skewed)
+                - Q-Q plot (academic mode only)
+                - Shapiro-Wilk normality test (academic mode only)
+        """
         if not self.numeric_cols_: return "<p>No numeric columns to analyze for distribution.</p>"
         all_panels_html = ""
         for col in self.numeric_cols_:
@@ -213,6 +373,16 @@ class NoventisAutoEDA:
         return all_panels_html
 
     def _plot_correlation_report(self) -> str:
+        """
+        Generates correlation analysis report with interactive filtering.
+        
+        Returns:
+            str: HTML string containing:
+                - Correlation heatmap (if columns <= 30)
+                - Interactive correlation matrix table (if columns > 30)
+                - Dropdown filter to highlight strong correlations
+                - Summary tables of top positive/negative correlations
+        """
         if len(self.numeric_cols_) < 2: return "<p>Not enough numeric features for correlation.</p>"
         correlation_matrix = self.df[self.numeric_cols_].corr(); corr_pairs = correlation_matrix.unstack().sort_values(kind="quicksort", ascending=False); corr_pairs = corr_pairs[corr_pairs != 1.0]
         correlation_main_content_html = ""
@@ -243,6 +413,23 @@ class NoventisAutoEDA:
         return f"{correlation_main_content_html}{all_summary_tables_html}"
 
     def _analyze_target_variable(self) -> str:
+        """
+        Analyzes the target variable and determines the problem type.
+        
+        Returns:
+            str: HTML string containing:
+                For Classification:
+                - Problem type detection (Binary/Multiclass)
+                - Number of classes
+                - Class distribution table
+                - Count plot visualization
+                
+                For Regression:
+                - Problem type detection
+                - Descriptive statistics
+                - Distribution histogram with KDE
+                - Box plot for outlier detection
+        """
         target_series = self.df[self.target]; dtype = target_series.dtype; n_unique = target_series.nunique()
         CLASSIFICATION_THRESHOLD = 25; problem_type = "Unknown"
         if dtype in ['object', 'category', 'bool']: problem_type = "Classification"
@@ -262,11 +449,19 @@ class NoventisAutoEDA:
             return f"""<div class="grid-container"><div class="grid-item"><h4>Detected Problem Type</h4><p>{problem_type}</p></div><div class="grid-item"><h4>Unique Values</h4><p>{n_unique}</p></div></div><h3>Descriptive Statistics</h3><div class='table-scroll-wrapper'>{stats_df.to_html(classes='styled-table')}</div><div style="display: flex; gap: 2rem; margin-top: 2rem; flex-wrap: wrap;"><div class="plot-container" style="flex: 1; min-width: 400px;"><h4>Distribution Plot</h4><img src='{plot1_b64}'></div><div class="plot-container" style="flex: 1; min-width: 400px;"><h4>Box Plot</h4><img src='{plot2_b64}'></div></div>"""
         else: return f"<p>Could not determine problem type for target '{self.target}'. Dtype: {dtype}, Unique Values: {n_unique}.</p>"
     
-# ini yang kuedit
-
     def _select_top_4_variables(self) -> list:
         """
-        🆕 TAMBAHAN: Smart selection untuk top 4 variables berdasarkan multiple criteria
+        Selects top 4 most important variables for distribution testing.
+        
+        Uses multiple criteria:
+        1. Target correlation (top 2)
+        2. High variance/variability (top 3)
+        3. Data quality concerns - missing rates between 5-80% (top 2)
+        4. Business relevance - domain keywords (top 2)
+        
+        Returns:
+            list: List of up to 4 column names that are most important for analysis.
+                Falls back to first 4 numeric columns if selection criteria don't yield enough.
         """
         candidates = []
         scores = {}
@@ -309,7 +504,20 @@ class NoventisAutoEDA:
     
     def _academic_panel_distribution_test(self) -> str:
         """
-        🆕 TAMBAHAN: Distribution Test Panel dengan Shapiro-Wilk untuk top 4 variables
+        Generates academic panel for distribution normality testing.
+        
+        Performs Shapiro-Wilk test on top 4 selected variables to test normality.
+        
+        Returns:
+            str: HTML string containing:
+                - 4-panel grid showing mini histograms
+                - Test results with badges (✓ Normal, ✗ Non-Normal, ? Failed)
+                - P-values and interpretations
+                - Test explanation footer
+                - Placeholder if no numeric columns available
+        
+        Note:
+            For datasets > 5000 rows, samples 5000 random rows for testing.
         """
         if not self.numeric_cols_:
             return "<div class='academic-panel-placeholder'><h4>Distribution Test</h4><p>No numeric columns available for distribution testing.</p></div>"
@@ -391,7 +599,20 @@ class NoventisAutoEDA:
     
     def _calculate_vif(self, dataframe) -> dict:
         """
-        🆕 TAMBAHAN: Calculate Variance Inflation Factor untuk multicollinearity detection
+        Calculates Variance Inflation Factor (VIF) for multicollinearity detection.
+        
+        Args:
+            dataframe (pd.DataFrame): DataFrame containing numeric features.
+        
+        Returns:
+            dict: Dictionary mapping column names to VIF values.
+                Empty dict if calculation fails or insufficient data.
+                VIF values are capped at 999.9 for extreme cases.
+        
+        Note:
+            VIF > 10: High multicollinearity
+            VIF > 5: Moderate multicollinearity
+            VIF < 5: Acceptable
         """
         try:
             # Hanya gunakan numeric columns dan remove target
@@ -428,7 +649,17 @@ class NoventisAutoEDA:
     
     def _academic_panel_correlation_validation(self) -> str:
         """
-        🆕 TAMBAHAN: Correlation + VIF Analysis Panel
+        Generates academic panel for correlation validation and multicollinearity check.
+        
+        Returns:
+            str: HTML string containing:
+                - Correlation heatmap (if ≤ 8 variables)
+                - List of high correlations (|r| > 0.5)
+                - VIF table with color-coded alerts:
+                  * Green (✓): VIF < 5 (OK)
+                  * Yellow (⚠): 5 ≤ VIF ≤ 10 (Medium)
+                  * Red (⚠): VIF > 10 (High multicollinearity)
+                - Placeholder if insufficient numeric features
         """
         if len(self.numeric_cols_) < 2:
             return "<div class='academic-panel-placeholder'><h4>Correlation Validation</h4><p>Not enough numeric features for correlation analysis.</p></div>"
@@ -503,7 +734,22 @@ class NoventisAutoEDA:
     
     def _fit_diagnostic_model(self):
         """
-        🆕 TAMBAHAN: Fit simple model untuk diagnostics purposes
+        Fits a diagnostic model for model validation analysis.
+        
+        Uses appropriate model based on target type:
+        - Classification: RandomForestClassifier (for categorical/discrete targets)
+        - Regression: LinearRegression (for continuous targets)
+        
+        Returns:
+            tuple: (model, data_tuple, cv_scores) where:
+                - model: Fitted sklearn model object
+                - data_tuple: (X, y, y_pred) - features, target, predictions
+                - cv_scores: Cross-validation scores array
+                Returns (None, None, None) if model cannot be fitted.
+        
+        Note:
+            Limited to 5 features to prevent overfitting and reduce computation.
+            Uses 5-fold cross-validation (or fewer if sample size is small).
         """
         try:
             if not self.target or self.target not in self.df.columns:
@@ -548,7 +794,25 @@ class NoventisAutoEDA:
     
     def _academic_panel_model_diagnostics(self) -> str:
         """
-        🆕 TAMBAHAN: Model Diagnostics Panel dengan residuals, CV score, feature importance
+        Generates academic panel for model diagnostics and validation.
+        
+        Returns:
+            str: HTML string containing three diagnostic sections:
+                1. Residual Analysis:
+                   - Residual vs Fitted scatter plot
+                   - Pattern detection (Random ✓ or Pattern Detected ⚠)
+                
+                2. Cross-Validation Score:
+                   - Circular gauge visualization
+                   - Color-coded performance (Excellent/Good/Poor)
+                   - Standard deviation of CV scores
+                
+                3. Feature Importance:
+                   - Top 3 most important features
+                   - Horizontal bar chart representation
+                   - Importance values
+                
+                Returns placeholder if target not available or model fails to fit.
         """
         if not self.target:
             return "<div class='academic-panel-placeholder'><h4>Model Diagnostics</h4><p>Requires a target variable for model diagnostics.</p></div>"
@@ -661,7 +925,13 @@ class NoventisAutoEDA:
     
     def _generate_academic_dashboard(self) -> str:
         """
-        🆕 TAMBAHAN: Generate complete Academic Statistical Validation Dashboard
+        Generates complete academic dashboard combining all statistical panels.
+        
+        Returns:
+            str: HTML string containing three-panel academic dashboard:
+                - Distribution Test panel (Shapiro-Wilk normality tests)
+                - Correlation Validation panel (correlation matrix + VIF)
+                - Model Diagnostics panel (residuals, CV scores, feature importance)
         """
         panel1 = self._academic_panel_distribution_test()
         panel2 = self._academic_panel_correlation_validation()  
@@ -686,8 +956,29 @@ class NoventisAutoEDA:
         </div>
         """
         
-    
     def generate_html_report(self, report_height: int, show_base_viz: bool) -> HTML:
+        """
+        Generates the complete interactive HTML report.
+        
+        Args:
+            report_height (int): Height of the report container in pixels.
+            show_base_viz (bool): Whether to include base visualization tabs
+                (Overview, Stats, Missing Values, Outliers, Distributions, Correlation).
+        
+        Returns:
+            IPython.display.HTML: Complete HTML report object with:
+                - Dynamic tab navigation
+                - Personality-specific dashboards
+                - Interactive visualizations
+                - Responsive styling
+        
+        Note:
+            Tab configuration varies based on personality:
+            - 'business': Adds Business Impact tab
+            - 'academic': Adds Statistical Validation tab
+            - 'all': Includes both business and academic tabs
+            - 'default': Only base visualizations
+        """
         tabs_config = []; report_title = "Noventis Automated EDA Report"
         if self.personality in ['business']:
             report_title = "Noventis Business Intelligence Report"
@@ -718,7 +1009,7 @@ class NoventisAutoEDA:
             navbar_html += f"""<button class="nav-btn {active_class}" onclick="showTab(event, '{tab['id']}', '{self.report_id}')">{tab['title']}</button>"""
             content = tab['content_func'](); main_content_html += f"""<section id="{tab['id']}-{self.report_id}" class="content-section {active_class}"><h2>{tab['title']}</h2>{content}</section>"""
         
-        # 🆕 TAMBAHAN: Extended CSS untuk Academic Dashboard components
+        # Extended CSS untuk Academic Dashboard components
         extended_css = """
         /* Academic Dashboard Styles */
         .academic-dashboard-container { margin-top: 2rem; }
@@ -881,6 +1172,39 @@ class NoventisAutoEDA:
 
 
     def run(self, show_base_viz: bool = True) -> HTML:
+        """
+        Main method to execute the EDA and generate the HTML report.
+        
+        Args:
+            show_base_viz (bool, optional): Whether to include base visualization tabs.
+                If False, must have a non-default personality selected.
+                Defaults to True.
+        
+        Returns:
+            IPython.display.HTML: Complete interactive HTML report ready for display
+                in Jupyter notebooks or web browsers.
+        
+        Raises:
+            ValueError: If show_base_viz=False but personality='default'
+                (no content would be generated).
+        
+        Examples:
+            >>> # Basic usage with all visualizations
+            >>> eda = NoventisAutoEDA('data.csv', target='price')
+            >>> eda.run()
+            
+            >>> # Business intelligence mode only
+            >>> eda = NoventisAutoEDA('data.csv', target='revenue', personality='business')
+            >>> eda.run(show_base_viz=False)
+            
+            >>> # Academic mode with base visualizations
+            >>> eda = NoventisAutoEDA('data.csv', target='score', personality='academic')
+            >>> eda.run(show_base_viz=True)
+            
+            >>> # Complete analysis with all features
+            >>> eda = NoventisAutoEDA('data.csv', target='sales', personality='all')
+            >>> eda.run()
+        """
         if not show_base_viz and self.personality == 'default':
             raise ValueError("Jika base_viz=False, Anda harus memilih 'personality' ('academic', 'business', atau 'all').")
         print(f"Generating EDA report with '{self.personality}' personality, please wait...")

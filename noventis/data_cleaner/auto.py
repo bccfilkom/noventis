@@ -8,7 +8,16 @@ import matplotlib.pyplot as plt
 import uuid
 
 def plot_to_base64(fig):
-    """Converts a Matplotlib figure to a Base64 string for HTML embedding."""
+    """
+    Converts a Matplotlib figure to a Base64 string for HTML embedding.
+    
+    Args:
+        fig (matplotlib.figure.Figure): The Matplotlib figure object to convert.
+    
+    Returns:
+        str: Base64-encoded string of the image in PNG format with data URI prefix,
+             or empty string if fig is None.
+    """
     if fig is None:
         return ""
     buf = io.BytesIO()
@@ -24,6 +33,7 @@ class NoventisDataCleaner:
     A wrapper (orchestrator) class to run a data cleaning pipeline
     consisting of Imputation, Outlier Handling, Encoding, and Scaling.
     """
+    
     def __init__(self,
                  pipeline_steps: list = ['impute', 'outlier', 'encode', 'scale'],
                  imputer_params: dict = None,
@@ -31,7 +41,44 @@ class NoventisDataCleaner:
                  encoder_params: dict = None,
                  scaler_params: dict = None,
                  verbose: bool = False):
-        """Initializes the NoventisDataCleaner."""
+        """
+        Initializes the NoventisDataCleaner.
+        
+        Args:
+            pipeline_steps (list, optional): List of pipeline steps to execute in order.
+                Valid values: 'impute', 'outlier', 'encode', 'scale'.
+                Defaults to ['impute', 'outlier', 'encode', 'scale'].
+            imputer_params (dict, optional): Parameters to pass to NoventisImputer.
+                Example: {'method': 'mean', 'strategy': 'column'}.
+                Defaults to None (empty dict).
+            outlier_params (dict, optional): Parameters to pass to NoventisOutlierHandler.
+                Example: {'default_method': 'iqr_trim', 'threshold': 1.5}.
+                Defaults to None (empty dict).
+            encoder_params (dict, optional): Parameters to pass to NoventisEncoder.
+                Example: {'method': 'ohe', 'target_column': 'target'}.
+                Defaults to None (empty dict).
+            scaler_params (dict, optional): Parameters to pass to NoventisScaler.
+                Example: {'method': 'standard', 'with_mean': True}.
+                Defaults to None (empty dict).
+            verbose (bool, optional): If True, prints detailed progress information.
+                Defaults to False.
+        
+        Attributes:
+            pipeline_steps (list): The steps to execute in the pipeline.
+            imputer_params (dict): Configuration for the imputer.
+            outlier_params (dict): Configuration for the outlier handler.
+            encoder_params (dict): Configuration for the encoder.
+            scaler_params (dict): Configuration for the scaler.
+            verbose (bool): Verbosity flag.
+            imputer_ (NoventisImputer): Fitted imputer instance.
+            outlier_handler_ (NoventisOutlierHandler): Fitted outlier handler instance.
+            encoder_ (NoventisEncoder): Fitted encoder instance.
+            scaler_ (NoventisScaler): Fitted scaler instance.
+            is_fitted_ (bool): Flag indicating if the pipeline has been fitted.
+            reports_ (dict): Dictionary containing reports from each pipeline step.
+            quality_score_ (dict): Dictionary containing overall quality scores.
+            report_id (str): Unique identifier for HTML report generation.
+        """
         self.pipeline_steps = pipeline_steps
         self.imputer_params = imputer_params or {}
         self.outlier_params = outlier_params or {}
@@ -52,7 +99,23 @@ class NoventisDataCleaner:
         self.report_id = f"noventis-report-{uuid.uuid4().hex[:8]}"
 
     def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
-        """Executes the entire fit and transform pipeline on the data."""
+        """
+        Executes the entire fit and transform pipeline on the data.
+        
+        Args:
+            X (pd.DataFrame): Input DataFrame containing features to be cleaned.
+                Must be a pandas DataFrame.
+            y (pd.Series, optional): Target variable series. Used for target encoding
+                and preserved through transformations that may drop rows.
+                Defaults to None.
+        
+        Returns:
+            pd.DataFrame: Cleaned and transformed DataFrame after applying all
+                pipeline steps.
+        
+        Raises:
+            TypeError: If X is not a pandas DataFrame.
+        """
         if not isinstance(X, pd.DataFrame):
             raise TypeError("Input 'X' must be a pandas DataFrame.")
 
@@ -112,6 +175,20 @@ class NoventisDataCleaner:
         """
         Calculates the overall data quality score with improved methodology.
         Focuses on data readiness for ML rather than penalizing legitimate transformations.
+        
+        The quality score is computed based on:
+        - Completeness (40%): Percentage of non-missing values
+        - Consistency (30%): Quality after outlier handling
+        - Distribution Quality (20%): Improvement in data distribution
+        - Feature Engineering (10%): Encoding efficiency
+        
+        The results are stored in self.quality_score_ dictionary.
+        
+        Args:
+            None (uses internal state)
+        
+        Returns:
+            None (updates self.quality_score_ attribute)
         """
         from .data_quality import assess_data_quality
         
@@ -182,7 +259,20 @@ class NoventisDataCleaner:
         }
 
     def display_summary_report(self):
-        """Displays the comprehensive final summary report in the console."""
+        """
+        Displays the comprehensive final summary report in the console.
+        
+        Prints:
+        - Overall quality score with breakdown by component
+        - Summary of each pipeline step execution
+        - Number of values imputed, outliers removed, features encoded, and columns scaled
+        
+        Args:
+            None (uses internal state)
+        
+        Returns:
+            None (prints to console)
+        """
         if not self.is_fitted_:
             print("Cleaner has not been run. Execute .fit_transform() first.")
             return
@@ -216,13 +306,39 @@ class NoventisDataCleaner:
         print("\n" + "="*65)
 
     def _get_plot_html(self, base64_str: str, title: str, description: str) -> str:
-        """Helper to generate HTML for a plot or a fallback message."""
+        """
+        Helper to generate HTML for a plot or a fallback message.
+        
+        Args:
+            base64_str (str): Base64-encoded image string.
+            title (str): Title for the plot section.
+            description (str): Description text for the plot.
+        
+        Returns:
+            str: HTML string containing the plot image or fallback message.
+        """
         if base64_str:
             return f'<h3>{title}</h3><p class="plot-desc">{description}</p><div class="plot-container"><img src="{base64_str}"></div>'
         return f"<h3>{title}</h3><p>Visualization was not generated for this step.</p>"
 
     def generate_html_report(self) -> HTML:
-        """Generates and displays a complete, visually appealing, and interactive HTML report."""
+        """
+        Generates and displays a complete, visually appealing, and interactive HTML report.
+        
+        Creates a multi-tab HTML report with:
+        - Overview tab: Quality scores and data statistics
+        - Imputer tab: Missing value handling visualizations
+        - Outlier tab: Outlier detection and removal results
+        - Scaler tab: Feature scaling comparisons
+        - Encoder tab: Categorical encoding transformations
+        
+        Args:
+            None (uses internal state)
+        
+        Returns:
+            IPython.display.HTML: Interactive HTML report object that can be displayed
+                in Jupyter notebooks. Returns error message if not fitted.
+        """
         if not self.is_fitted_ or self._original_df is None:
             return HTML("<h3>Report cannot be generated.</h3><p>Please run the `.fit_transform()` method first.</p>")
     
@@ -857,19 +973,69 @@ def data_cleaner(
 
     Args:
         data (Union[str, pd.DataFrame]): Path to a CSV file or an existing DataFrame.
-        target_column (str, optional): Name of the target column. Important for some 'auto' modes.
-        null_handling (str): Method for handling nulls ('auto', 'mean', 'median', 'mode', 'drop', etc.).
-        outlier_handling (str): Method for handling outliers ('auto', 'iqr_trim', 'winsorize', 'dropping').
-        encoding (str): Method for encoding ('auto', 'ohe', 'label', 'target', etc.).
-        scaling (str): Method for scaling ('auto', 'minmax', 'standard', 'robust').
-        verbose (bool): If True, displays detailed reports during the process.
-        return_instance (bool): If True, returns a tuple of (DataFrame, cleaner_instance). 
-                                If False (default), returns only the cleaned DataFrame.
+            If string, must be a valid path to a CSV file.
+            If DataFrame, will be copied and processed.
+        target_column (str, optional): Name of the target column. Important for some 'auto' modes
+            and target encoding. If specified, this column will be separated from features.
+            Defaults to None.
+        null_handling (str, optional): Method for handling nulls.
+            Options: 'auto', 'mean', 'median', 'mode', 'drop', 'forward_fill', 'backward_fill'.
+            'auto' lets the imputer decide the best strategy.
+            Defaults to 'auto'.
+        outlier_handling (str, optional): Method for handling outliers.
+            Options: 'auto', 'iqr_trim', 'winsorize', 'dropping', 'z_score'.
+            'dropping' is mapped to 'iqr_trim' internally.
+            Defaults to 'auto'.
+        encoding (str, optional): Method for encoding categorical variables.
+            Options: 'auto', 'ohe' (one-hot), 'label', 'target', 'ordinal', 'frequency'.
+            'auto' lets the encoder decide based on cardinality and data type.
+            Defaults to 'auto'.
+        scaling (str, optional): Method for scaling numerical features.
+            Options: 'auto', 'minmax', 'standard', 'robust', 'maxabs', 'normalizer'.
+            'auto' lets the scaler decide the best method.
+            Defaults to 'auto'.
+        verbose (bool, optional): If True, displays detailed reports during the process
+            including step-by-step progress and final quality summary.
+            Defaults to True.
+        return_instance (bool, optional): If True, returns a tuple of (DataFrame, cleaner_instance).
+            If False, returns only the cleaned DataFrame. Set to True if you need to access
+            reports or generate HTML visualizations later.
+            Defaults to False.
 
     Returns:
         Union[pd.DataFrame, Tuple[pd.DataFrame, NoventisDataCleaner]]:
-            - The cleaned DataFrame (default).
-            - A tuple of (cleaned DataFrame, NoventisDataCleaner instance) if return_instance is True.
+            - The cleaned DataFrame (default behavior when return_instance=False).
+            - A tuple of (cleaned DataFrame, NoventisDataCleaner instance) if return_instance=True.
+              The cleaner instance provides access to:
+                * .reports_: Dictionary of detailed reports from each step
+                * .quality_score_: Overall quality metrics
+                * .generate_html_report(): Method to create interactive HTML report
+                * Individual component instances (.imputer_, .outlier_handler_, etc.)
+    
+    Raises:
+        TypeError: If data is not a string (file path) or pandas DataFrame.
+        FileNotFoundError: If the provided file path does not exist.
+    
+    Examples:
+        >>> # Basic usage - returns cleaned DataFrame only
+        >>> cleaned_df = data_cleaner('data.csv', target_column='target')
+        
+        >>> # Advanced usage - returns DataFrame and cleaner instance
+        >>> cleaned_df, cleaner = data_cleaner(
+        ...     data='data.csv',
+        ...     target_column='price',
+        ...     null_handling='median',
+        ...     outlier_handling='iqr_trim',
+        ...     encoding='ohe',
+        ...     scaling='standard',
+        ...     verbose=True,
+        ...     return_instance=True
+        ... )
+        >>> # Generate interactive HTML report
+        >>> cleaner.generate_html_report()
+        
+        >>> # Access quality metrics
+        >>> print(cleaner.quality_score_)
     """
     # Load Data
     try:
