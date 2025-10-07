@@ -1,5 +1,3 @@
-# noventis/utils/templates.py
-
 from IPython.display import HTML
 
 # Semua CSS dari NoventisAutoEDA disalin ke sini untuk tampilan yang konsisten.
@@ -147,29 +145,29 @@ h3 {
 }
 """
 
-def generate_standalone_report(title: str, subtitle: str, content_html: str) -> HTML:
-    """
-    Membungkus konten laporan (KPI, tabel, plot) dengan kerangka HTML dan CSS standar.
-    """
-    full_html = f\"\"\"
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>{title}</title>
-        <style>{REPORT_CSS}</style>
-    </head>
-    <body>
-        <div class="container" style="padding: 1.5rem;">
-            <header>
-                <h1>{title}</h1>
-                <p>{subtitle}</p>
-            </header>
-            <main>
-                {content_html}
-            </main>
-        </div>
-    </body>
-    </html>
-    \"\"\"
-    return HTML(full_html)
+# def generate_standalone_report(title: str, subtitle: str, content_html: str) -> HTML:
+#     """
+#     Membungkus konten laporan (KPI, tabel, plot) dengan kerangka HTML dan CSS standar.
+#     """
+#     full_html = f\"\"\"
+#     <!DOCTYPE html>
+#     <html lang="en">
+#     <head>
+#         <meta charset="UTF-8">
+#         <title>{title}</title>
+#         <style>{REPORT_CSS}</style>
+#     </head>
+#     <body>
+#         <div class="container" style="padding: 1.5rem;">
+#             <header>
+#                 <h1>{title}</h1>
+#                 <p>{subtitle}</p>
+#             </header>
+#             <main>
+#                 {content_html}
+#             </main>
+#         </div>
+#     </body>
+#     </html>
+#     \"\"\"
+#     return HTML(full_html)
