@@ -553,7 +553,7 @@ class NoventisAutoML:
             random_state=self.random_state
         )
         
-        result = predictor.run_pipeline(
+        result = predictor.fit(
             self.df, 
             target_column=self.target_column, 
             test_size=self.test_size

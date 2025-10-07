@@ -1,0 +1,12 @@
+======================================================================
+         NOVENTIS AutoML - MODEL SUMMARY
+======================================================================
+
+Task Type: Regression
+Best Model: Xgboost
+Target Column: MedHouseVal
+Dataset Shape: (20640, 9)
+Train/Test Split: 16512/4128
+
+PERFORMANCE METRICS:
+----------------------------------------
