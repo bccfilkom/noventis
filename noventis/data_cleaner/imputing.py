@@ -291,13 +291,11 @@ class NoventisImputer:
                                  gridspec_kw={'height_ratios': [1, 2]})
         fig.suptitle(f"Imputation Comparison for '{col_to_plot}'", fontsize=20, color=text_color, weight='bold')
 
-        # --- BEFORE ---
         sns.heatmap(original_data.isnull(), cbar=False, ax=axes[0, 0], cmap='viridis')
         axes[0, 0].set_title("Before: Location of Missing Data (Yellow)", color=text_color, fontsize=14)
         sns.histplot(original_data[col_to_plot].dropna(), kde=True, ax=axes[1, 0], color=color_before)
         axes[1, 0].set_title(f"Before: Distribution of '{col_to_plot}'", color=text_color, fontsize=14)
 
-        # --- AFTER ---
         sns.heatmap(transformed_data.isnull(), cbar=False, ax=axes[0, 1], cmap='viridis')
         axes[0, 1].set_title("After: Missing Data Handled", color=text_color, fontsize=14)
         sns.histplot(transformed_data[col_to_plot], kde=True, ax=axes[1, 1], color=color_after)

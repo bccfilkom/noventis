@@ -1,10 +1,28 @@
+# Include documentation files
 include README.md
 include LICENSE
+include CHANGELOG.md
 
-recursive-include dataset_for_examples *
+# Include requirements files
+include requirements.txt
+include requirements-dev.txt
 
-recursive-include docs *
-recursive-include examples *
+# Include configuration files
+include pyproject.toml
+include setup.py
+include setup.cfg
 
-global-exclude *.pyc
-global-exclude __pycache__/
+# Exclude unnecessary files
+exclude .gitignore
+exclude .gitattributes
+
+# Exclude test files
+recursive-exclude tests *
+recursive-exclude examples *
+recursive-exclude docs *
+
+# Exclude cache and build files
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude *.so
+global-exclude .DS_Store
