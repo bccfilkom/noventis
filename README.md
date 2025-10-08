@@ -288,14 +288,14 @@ This project exists thanks to all the people who contribute:
 | Contributor            | Role              |
 | ---------------------- | ----------------- |
 | **Richard**            | Product Manager   |
-| **Fatoni Murfids**     | Product Manager   |
-| **Orie Abyan Maulana** | Data Analyst      |
+| **Fatoni Murfids**     | AI Product Manager   |
+| **Ahmad Nafi Mubarok**      | Lead Data Scientist    |
+| **Orie Abyan Maulana** | Lead Data Analyst      |
 | **Grace Wahyuni**      | Data Analyst      |
-| **Ahmad Nafi M.**      | Data Scientist    |
 | **Alexander Angelo**   | Data Scientist    |
 | **Rimba Nevada**       | Data Scientist    |
 | **Jason Surya Winata** | Frontend Engineer |
-| **Daffa**              | Product Designer  |
+| **Nada Musyaffa Bilhaqi**              | Product Designer  |
 
 
 ### Special Thanks
@@ -394,42 +394,6 @@ noventis.print_info()  # Check all dependencies
 
 - 📖 [Documentation](https://docs.noventis.dev)
 - 🐛 [GitHub Issues](https://github.com/bcc/noventis/issues)
-
----
-
-## 📊 Performance Benchmarks
-
-Noventis is optimized for speed and efficiency:
-
-| Dataset Size | Data Cleaning | EDA Generation | Model Training |
-|-------------|---------------|----------------|----------------|
-| 10K rows    | < 1 second    | 2-3 seconds   | 5-10 seconds   |
-| 100K rows   | 2-3 seconds   | 10-15 seconds | 30-60 seconds  |
-| 1M rows     | 10-15 seconds | 1-2 minutes   | 5-10 minutes   |
-
-*Benchmarks run on: Intel i7-10700K, 32GB RAM, Python 3.10*
-
----
-
-## 🗺️ Roadmap
-
-### Current Version (v0.1.0)
-- ✅ Core data cleaning functionality
-- ✅ Automated EDA
-- ✅ Basic predictor with AutoML
-
-### Upcoming Features (v0.2.0)
-- 🚧 Deep learning integration
-- 🚧 Time series forecasting
-- 🚧 Advanced feature engineering
-- 🚧 Model deployment tools
-- 🚧 Web-based dashboard
-
-### Future Plans (v1.0.0)
-- 📅 GPU acceleration
-- 📅 Distributed computing support
-- 📅 Real-time data processing
-- 📅 Cloud integration (AWS, GCP, Azure)
 
 ---
 
