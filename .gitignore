@@ -1,68 +1,62 @@
-/noventis/__pycache__/
-/noventis.data_cleaner/__pycache__
-
-# Folder cache Python
-*__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Folder lingkungan virtual
-.venv/
-venv/
-env/
-
-# Folder hasil build dan distribusi
-dist/
-build/
-*.egg-info/
-
-# File-file spesifik editor/OS
-.vscode/
-.idea/
-*.DS_Store__pycache__/
-
-# Folder cache Python
 __pycache__/
+*__pycache__/
+*__pycache__
 *.pyc
 *.pyo
 *.pyd
-
-# Folder lingkungan virtual
+build/
+dist/
+*.egg-info/
+*.egg
 .venv/
 venv/
 env/
-# Folder hasil build dan distribusi
-dist/
-build/
-*.egg-info/
-# File-file spesifik editor/OS
+ENV/
+.conda/
+*.env
+.envrc
 .vscode/
 .idea/
 *.DS_Store
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints
-# Logs
-logs/
-*.log
-# Temporary files
+*.swp
+*.swo
+*.bak
+Thumbs.db
+.ipynb_checkpoints/
 tmp/
 temp/
 *.tmp
-# Coverage reports
+*.log
+logs/
 htmlcov/
 .coverage
 .coverage.*
-# pytest cache
 .pytest_cache/
-# mypy cache
 .mypy_cache/
 .dmypy.json
-# Pyre type checker cache
 .pyre/
-# Cython debug symbols
 cython_debug/
-# Environment variables file
-
-
 *.pkl
+*.joblib
+*.h5
+*.ckpt
+*.model
+*.dat
+examples/catboost_info/
+examples/catboost_info/learn/
+noventis/__pycache__/
+noventis.data_cleaner/__pycache__/
+data/
+datasets/
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.json
+*.parquet
+*.feather
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
