@@ -181,7 +181,7 @@ MODEL_CONFIG = {
 
 
 
-class NoventisManualPredictor:
+class NoventisManualML:
     """
     Manual machine learning predictor with hyperparameter tuning using Optuna.
     
