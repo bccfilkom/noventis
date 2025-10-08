@@ -46,19 +46,6 @@
 pip install noventis
 ```
 
-### Install with Optional Dependencies
-
-```bash
-# For handling imbalanced datasets
-pip install noventis[imbalanced]
-
-# For development
-pip install noventis[dev]
-
-# Install all optional dependencies
-pip install noventis[all]
-```
-
 ### Install from Source
 
 ```bash
