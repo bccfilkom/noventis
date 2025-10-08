@@ -240,6 +240,7 @@ class NoventisManualPredictor:
         Raises:
             ValueError: If task is not 'classification' or 'regression'
         """
+        self._report_id = f"report-{id(self)}"
         self.model_name = model_name
         self.task_type = task.lower()  # Renamed from self.task to match AutoML
         self.random_state = random_state
@@ -1689,182 +1690,197 @@ class NoventisManualPredictor:
         summary_html = self._get_summary_html()
         comparison_table_html = self._get_comparison_table_html()
         plots_html = self._get_plots_html()
+
+        report_id = self._report_id
         
-        # Complete HTML template (CSS preserved from original)
+        # Complete HTML template with FIXED CSS selectors
         html_template = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manual Predictor Report</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Exo+2:wght@700&display=swap');
-        #manual-predictor-report {{
-            --bg-dark-1: #0D1117; --bg-dark-2: #161B22; --border-color: #30363D;
-            --primary-blue: #58A6FF; --primary-orange: #F78166;
-            --text-light: #C9D1D9; --text-medium: #8B949E;
-            font-family: 'Roboto', sans-serif; background-color: var(--bg-dark-1);
-            color: var(--text-light); line-height: 1.6;
-        }}
-        #manual-predictor-report * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        #manual-predictor-report .container {{
-            max-width: 1400px; margin: auto; background-color: var(--bg-dark-2);
-            border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;
-        }}
-        #manual-predictor-report header {{
-            padding: 30px; background: linear-gradient(135deg, #1A2D40 0%, #0D1117 100%);
-            text-align: center; border-bottom: 2px solid var(--border-color);
-        }}
-        #manual-predictor-report header h1 {{ font-family: 'Exo 2', sans-serif; color: var(--primary-blue); 
-                    margin: 0; font-size: 2.5rem; text-shadow: 0 2px 10px rgba(88, 166, 255, 0.3); }}
-        #manual-predictor-report header p {{ margin: 10px 0 0; color: var(--text-medium); font-size: 1.1rem; }}
-        #manual-predictor-report .navbar {{ display: flex; background-color: var(--bg-dark-2); 
-                border-bottom: 1px solid var(--border-color); overflow-x: auto; }}
-        #manual-predictor-report .nav-btn {{
-            background: none; border: none; color: var(--text-medium);
-            padding: 15px 25px; cursor: pointer; font-size: 16px;
-            border-bottom: 3px solid transparent; transition: all 0.3s;
-            white-space: nowrap;
-        }}
-        #manual-predictor-report .nav-btn:hover {{ color: var(--text-light); background-color: rgba(88, 166, 255, 0.1); }}
-        #manual-predictor-report .nav-btn.active {{ color: var(--primary-orange); border-bottom-color: var(--primary-orange); 
-                        font-weight: 700; }}
-        #manual-predictor-report .content-section {{ padding: 30px; display: none; animation: fadeIn-report 0.5s; }}
-        #manual-predictor-report .content-section.active {{ display: block; }}
-        @keyframes fadeIn-report {{ from {{ opacity: 0; transform: translateY(10px); }} 
-                            to {{ opacity: 1; transform: translateY(0); }} }}
-        #manual-predictor-report h2 {{ font-family: 'Exo 2'; color: var(--primary-orange); font-size: 2rem; 
-            margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--border-color); }}
-        #manual-predictor-report h4 {{ color: var(--primary-blue); margin: 20px 0 15px; font-size: 1.3rem; }}
-        #manual-predictor-report .grid-container {{
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 20px; margin-bottom: 30px;
-        }}
-        #manual-predictor-report .grid-item {{
-            background-color: var(--bg-dark-1); padding: 20px;
-            border-radius: 8px; border: 1px solid var(--border-color);
-            transition: transform 0.3s, box-shadow 0.3s;
-        }}
-        #manual-predictor-report .grid-item:hover {{ transform: translateY(-5px); 
-                        box-shadow: 0 5px 20px rgba(88, 166, 255, 0.2); }}
-        #manual-predictor-report .grid-item h4 {{ margin-top: 0; color: var(--primary-blue); 
-                        border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }}
-        #manual-predictor-report .grid-item p {{ color: var(--text-medium); margin: 10px 0; }}
-        #manual-predictor-report .grid-item strong {{ color: var(--text-light); }}
-        #manual-predictor-report .score-card {{
-            text-align: center; background: linear-gradient(145deg, #1A2D40, #101820);
-            border: 2px solid var(--primary-orange);
-        }}
-        #manual-predictor-report .score-card .model-name {{
-            font-family: 'Exo 2'; font-size: 2.2em;
-            color: var(--primary-orange); margin: 15px 0;
-            text-shadow: 0 2px 10px rgba(247, 129, 102, 0.5);
-        }}
-        #manual-predictor-report .score-card .metric-score {{ font-size: 1.6em; color: var(--primary-blue); 
-                                    margin: 10px 0; font-weight: 700; }}
-        #manual-predictor-report .score-card .training-time {{ font-size: 1.1em; color: var(--text-medium); margin-top: 10px; }}
-        #manual-predictor-report .metrics-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }}
-        #manual-predictor-report .metric-item {{ display: flex; justify-content: space-between; padding: 8px 12px;
-                    background-color: var(--bg-dark-2); border-radius: 4px;
-                    border: 1px solid var(--border-color); }}
-        #manual-predictor-report .metric-label {{ color: var(--text-medium); font-size: 0.9em; }}
-        #manual-predictor-report .metric-value {{ color: var(--primary-blue); font-weight: 700; }}
-        #manual-predictor-report .params-box {{
-            background-color: #010409; padding: 15px; border-radius: 4px;
-            font-family: 'Courier New', monospace; font-size: 0.9em;
-            white-space: pre-wrap; word-wrap: break-word; color: var(--text-light);
-            border: 1px solid var(--border-color); margin-top: 10px;
-            max-height: 200px; overflow-y: auto;
-        }}
-        #manual-predictor-report .params-box::-webkit-scrollbar {{ width: 8px; }}
-        #manual-predictor-report .params-box::-webkit-scrollbar-track {{ background: var(--bg-dark-1); }}
-        #manual-predictor-report .params-box::-webkit-scrollbar-thumb {{ background: var(--border-color); border-radius: 4px; }}
-        #manual-predictor-report .table-container {{ overflow-x: auto; margin-top: 20px; }}
-        #manual-predictor-report .table-container table {{
-            width: 100%; border-collapse: collapse; background-color: var(--bg-dark-1);
-            border-radius: 8px; overflow: hidden;
-        }}
-        #manual-predictor-report .table-container th, #manual-predictor-report .table-container td {{
-            padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color);
-        }}
-        #manual-predictor-report .table-container thead {{ background-color: #1A2D40; }}
-        #manual-predictor-report .table-container tbody tr:hover {{ background-color: #222b38; }}
-        #manual-predictor-report .plot-container {{
-            background-color: var(--bg-dark-1); padding: 20px; border-radius: 8px;
-            border: 1px solid var(--border-color); margin: 20px 0;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-        }}
-        #manual-predictor-report .plot-container img {{ max-width: 100%; height: auto; display: block; margin: auto; 
-                            border-radius: 4px; }}
-        #manual-predictor-report .info-box {{
-            background: linear-gradient(135deg, rgba(88, 166, 255, 0.1), rgba(22, 27, 34, 0.5));
-            border-left: 4px solid var(--primary-blue); padding: 15px 20px;
-            margin: 20px 0; border-radius: 4px;
-        }}
-        #manual-predictor-report .info-box p {{ margin: 5px 0; color: var(--text-light); }}
-        @media (max-width: 768px) {{
-            #manual-predictor-report .grid-container {{ grid-template-columns: 1fr; }}
-            #manual-predictor-report .navbar {{ flex-direction: column; }}
-            #manual-predictor-report .nav-btn {{ width: 100%; text-align: left; }}
-        }}
-    </style>
-</head>
-<body>
-    <div id="manual-predictor-report">
-        <div class="container">
-            <header>
-                <h1>Manual Predictor Analysis Report</h1>
-                <p>Comprehensive Machine Learning Pipeline Results</p>
-            </header>
-            <nav class="navbar">
-                <button class="nav-btn active" onclick="showTab(event, 'summary')">Summary</button>
-                <button class="nav-btn" onclick="showTab(event, 'comparison')">Model Comparison</button>
-                <button class="nav-btn" onclick="showTab(event, 'visualizations')">Visualizations</button>
-            </nav>
-            <main>
-                <section id="summary" class="content-section active">
-                    <h2>Execution Summary</h2>
-                    {summary_html}
-                </section>
-                <section id="comparison" class="content-section">
-                    <h2>Detailed Metric Comparison</h2>
-                    <div class="info-box">
-                        <p><strong>Interpretation Guide:</strong></p>
-                        <p>Higher values indicate better performance for: Accuracy, Precision, Recall, F1 Score, R² Score</p>
-                        <p>Lower values indicate better performance for: MAE, MSE, RMSE</p>
-                    </div>
-                    {comparison_table_html}
-                </section>
-                <section id="visualizations" class="content-section">
-                    <h2>Result Visualizations</h2>
-                    {plots_html}
-                </section>
-            </main>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Manual Predictor Report</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Exo+2:wght@700&display=swap');
+            .{report_id} {{
+                --bg-dark-1: #0D1117; --bg-dark-2: #161B22; --border-color: #30363D;
+                --primary-blue: #58A6FF; --primary-orange: #F78166;
+                --text-light: #C9D1D9; --text-medium: #8B949E;
+                font-family: 'Roboto', sans-serif; background-color: var(--bg-dark-1);
+                color: var(--text-light); line-height: 1.6;
+            }}
+            .{report_id} * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            .{report_id} .container {{
+                max-width: 1400px; margin: auto; background-color: var(--bg-dark-2);
+                border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;
+            }}
+            .{report_id} header {{
+                padding: 30px; background: linear-gradient(135deg, #1A2D40 0%, #0D1117 100%);
+                text-align: center; border-bottom: 2px solid var(--border-color);
+            }}
+            .{report_id} header h1 {{ font-family: 'Exo 2', sans-serif; color: var(--primary-blue); 
+                        margin: 0; font-size: 2.5rem; text-shadow: 0 2px 10px rgba(88, 166, 255, 0.3); }}
+            .{report_id} header p {{ margin: 10px 0 0; color: var(--text-medium); font-size: 1.1rem; }}
+            .{report_id} .navbar {{ display: flex; background-color: var(--bg-dark-2); 
+                    border-bottom: 1px solid var(--border-color); overflow-x: auto; }}
+            .{report_id} .nav-btn {{
+                background: none; border: none; color: var(--text-medium);
+                padding: 15px 25px; cursor: pointer; font-size: 16px;
+                border-bottom: 3px solid transparent; transition: all 0.3s;
+                white-space: nowrap;
+            }}
+            .{report_id} .nav-btn:hover {{ color: var(--text-light); background-color: rgba(88, 166, 255, 0.1); }}
+            .{report_id} .nav-btn.active {{ color: var(--primary-orange); border-bottom-color: var(--primary-orange); 
+                            font-weight: 700; }}
+            .{report_id} .content-section {{ padding: 30px; display: none; animation: fadeIn 0.5s; }}
+            .{report_id} .content-section.active {{ display: block; }}
+            @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(10px); }} 
+                                to {{ opacity: 1; transform: translateY(0); }} }}
+            .{report_id} h2 {{ font-family: 'Exo 2'; color: var(--primary-orange); font-size: 2rem; 
+                margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--border-color); }}
+            .{report_id} h4 {{ color: var(--primary-blue); margin: 20px 0 15px; font-size: 1.3rem; }}
+            .{report_id} .grid-container {{
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                gap: 20px; margin-bottom: 30px;
+            }}
+            .{report_id} .grid-item {{
+                background-color: var(--bg-dark-1); padding: 20px;
+                border-radius: 8px; border: 1px solid var(--border-color);
+                transition: transform 0.3s, box-shadow 0.3s;
+            }}
+            .{report_id} .grid-item:hover {{ transform: translateY(-5px); 
+                            box-shadow: 0 5px 20px rgba(88, 166, 255, 0.2); }}
+            .{report_id} .grid-item h4 {{ margin-top: 0; color: var(--primary-blue); 
+                            border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }}
+            .{report_id} .grid-item p {{ color: var(--text-medium); margin: 10px 0; }}
+            .{report_id} .grid-item strong {{ color: var(--text-light); }}
+            .{report_id} .score-card {{
+                text-align: center; background: linear-gradient(145deg, #1A2D40, #101820);
+                border: 2px solid var(--primary-orange);
+            }}
+            .{report_id} .score-card .model-name {{
+                font-family: 'Exo 2'; font-size: 2.2em;
+                color: var(--primary-orange); margin: 15px 0;
+                text-shadow: 0 2px 10px rgba(247, 129, 102, 0.5);
+            }}
+            .{report_id} .score-card .metric-score {{ font-size: 1.6em; color: var(--primary-blue); 
+                                        margin: 10px 0; font-weight: 700; }}
+            .{report_id} .score-card .training-time {{ font-size: 1.1em; color: var(--text-medium); margin-top: 10px; }}
+            .{report_id} .metrics-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }}
+            .{report_id} .metric-item {{ display: flex; justify-content: space-between; padding: 8px 12px;
+                        background-color: var(--bg-dark-2); border-radius: 4px;
+                        border: 1px solid var(--border-color); }}
+            .{report_id} .metric-label {{ color: var(--text-medium); font-size: 0.9em; }}
+            .{report_id} .metric-value {{ color: var(--primary-blue); font-weight: 700; }}
+            .{report_id} .params-box {{
+                background-color: #010409; padding: 15px; border-radius: 4px;
+                font-family: 'Courier New', monospace; font-size: 0.9em;
+                white-space: pre-wrap; word-wrap: break-word; color: var(--text-light);
+                border: 1px solid var(--border-color); margin-top: 10px;
+                max-height: 200px; overflow-y: auto;
+            }}
+            .{report_id} .params-box::-webkit-scrollbar {{ width: 8px; }}
+            .{report_id} .params-box::-webkit-scrollbar-track {{ background: var(--bg-dark-1); }}
+            .{report_id} .params-box::-webkit-scrollbar-thumb {{ background: var(--border-color); border-radius: 4px; }}
+            .{report_id} .table-container {{ overflow-x: auto; margin-top: 20px; }}
+            .{report_id} .table-container table {{
+                width: 100%; border-collapse: collapse; background-color: var(--bg-dark-1);
+                border-radius: 8px; overflow: hidden;
+            }}
+            .{report_id} .table-container th, .{report_id} .table-container td {{
+                padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color);
+            }}
+            .{report_id} .table-container thead {{ background-color: #1A2D40; }}
+            .{report_id} .table-container tbody tr:hover {{ background-color: #222b38; }}
+            .{report_id} .plot-container {{
+                background-color: var(--bg-dark-1); padding: 20px; border-radius: 8px;
+                border: 1px solid var(--border-color); margin: 20px 0;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            }}
+            .{report_id} .plot-container img {{ max-width: 100%; height: auto; display: block; margin: auto; 
+                                border-radius: 4px; }}
+            .{report_id} .info-box {{
+                background: linear-gradient(135deg, rgba(88, 166, 255, 0.1), rgba(22, 27, 34, 0.5));
+                border-left: 4px solid var(--primary-blue); padding: 15px 20px;
+                margin: 20px 0; border-radius: 4px;
+            }}
+            .{report_id} .info-box p {{ margin: 5px 0; color: var(--text-light); }}
+            .{report_id} .shap-interpretation {{
+                background-color: var(--bg-dark-1); 
+                padding: 20px; 
+                border-radius: 8px;
+                border: 1px solid var(--border-color); 
+                margin: 20px 0;
+            }}
+            .{report_id} .shap-interpretation h5 {{
+                margin-top: 0;
+                font-size: 1.3em;
+            }}
+            .{report_id} .shap-interpretation h6 {{
+                font-size: 1.1em;
+            }}
+            .{report_id} .shap-interpretation li {{
+                line-height: 1.6;
+            }}
+            @media (max-width: 768px) {{
+                .{report_id} .grid-container {{ grid-template-columns: 1fr; }}
+                .{report_id} .navbar {{ flex-direction: column; }}
+                .{report_id} .nav-btn {{ width: 100%; text-align: left; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="{report_id}">
+            <div class="container">
+                <header>
+                    <h1>Manual Predictor Analysis Report</h1>
+                    <p>Comprehensive Machine Learning Pipeline Results</p>
+                </header>
+                <nav class="navbar">
+                    <button class="nav-btn active" onclick="showTab(event, 'summary', '{report_id}')">Summary</button>
+                    <button class="nav-btn" onclick="showTab(event, 'comparison', '{report_id}')">Model Comparison</button>
+                    <button class="nav-btn" onclick="showTab(event, 'visualizations', '{report_id}')">Visualizations</button>
+                </nav>
+                <main>
+                    <section id="summary" class="content-section active">
+                        <h2>Execution Summary</h2>
+                        {summary_html}
+                    </section>
+                    <section id="comparison" class="content-section">
+                        <h2>Detailed Metric Comparison</h2>
+                        <div class="info-box">
+                            <p><strong>Interpretation Guide:</strong></p>
+                            <p>Higher values indicate better performance for: Accuracy, Precision, Recall, F1 Score, R² Score</p>
+                            <p>Lower values indicate better performance for: MAE, MSE, RMSE</p>
+                        </div>
+                        {comparison_table_html}
+                    </section>
+                    <section id="visualizations" class="content-section">
+                        <h2>Result Visualizations</h2>
+                        {plots_html}
+                    </section>
+                </main>
+            </div>
         </div>
-    </div>
-    <script>
-        function showTab(event, tabName) {{
-            const reportScope = document.getElementById('manual-predictor-report');
-            reportScope.querySelectorAll('.content-section').forEach(section => {{
-                section.style.display = 'none';
-                section.classList.remove('active');
-            }});
-            reportScope.querySelectorAll('.nav-btn').forEach(btn => {{
-                btn.classList.remove('active');
-            }});
-            reportScope.querySelector('#' + tabName).style.display = 'block';
-            reportScope.querySelector('#' + tabName).classList.add('active');
-            event.currentTarget.classList.add('active');
-        }}
-        document.addEventListener("DOMContentLoaded", function() {{
-            const firstTab = document.querySelector('#manual-predictor-report .nav-btn');
-            if (firstTab) firstTab.click();
-        }});
-    </script>
-</body>
-</html>
-        """
+        <script>
+            function showTab(event, tabName, reportId) {{
+                const reportScope = document.querySelector('.' + reportId);
+                reportScope.querySelectorAll('.content-section').forEach(section => {{
+                    section.style.display = 'none';
+                    section.classList.remove('active');
+                }});
+                reportScope.querySelectorAll('.nav-btn').forEach(btn => {{
+                    btn.classList.remove('active');
+                }});
+                reportScope.querySelector('#' + tabName).style.display = 'block';
+                reportScope.querySelector('#' + tabName).classList.add('active');
+                event.currentTarget.classList.add('active');
+            }}
+        </script>
+    </body>
+    </html>
+            """
         
         # Save to file if path provided
         if filepath:
