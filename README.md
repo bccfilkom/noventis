@@ -285,15 +285,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 This project exists thanks to all the people who contribute:
 
-| Contributor | Role |
-|------------|------|
-| **Orie Abyan Maulana** | Data Analyst |
-| **Grace Wahyuni** | Data Analyst |
-| **Ahmad Nafi M.** | Data Scientist |
-| **Alexander Angelo** | Data Scientist |
-| **Rimba Nevada** | Data Scientist |
+| Contributor            | Role              |
+| ---------------------- | ----------------- |
+| **Richard**            | Product Manager   |
+| **Fatoni Murfids**     | Product Manager   |
+| **Orie Abyan Maulana** | Data Analyst      |
+| **Grace Wahyuni**      | Data Analyst      |
+| **Ahmad Nafi M.**      | Data Scientist    |
+| **Alexander Angelo**   | Data Scientist    |
+| **Rimba Nevada**       | Data Scientist    |
 | **Jason Surya Winata** | Frontend Engineer |
-| **Daffa** | Product Designer |
+| **Daffa**              | Product Designer  |
+
 
 ### Special Thanks
 
