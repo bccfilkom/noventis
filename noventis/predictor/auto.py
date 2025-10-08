@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 
-from .manual import NoventisManualPredictor
+from .manual import NoventisManualML
 
 warnings.filterwarnings('ignore')
 
@@ -364,7 +364,7 @@ class NoventisAutoML:
         print(f"\n[Manual] Training {len(self.model_list)} model(s)...")
         
         # Initialize manual predictor
-        predictor = NoventisManualPredictor(
+        predictor = NoventisManualML(
             model_name=self.model_list, 
             task=self.task_type, 
             random_state=self.random_state,
@@ -547,7 +547,7 @@ class NoventisAutoML:
         Args:
             models_to_compare: List of model names to train
         """
-        predictor = NoventisManualPredictor(
+        predictor = NoventisManualML(
             model_name=models_to_compare, 
             task=self.task_type, 
             random_state=self.random_state
@@ -556,7 +556,8 @@ class NoventisAutoML:
         result = predictor.fit(
             self.df, 
             target_column=self.target_column, 
-            test_size=self.test_size
+            test_size=self.test_size,
+            display_report=False
         )
         
         self.manual_model = predictor

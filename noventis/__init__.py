@@ -8,7 +8,7 @@ from .data_cleaner.scaling import NoventisScaler
 from .data_cleaner.imputing import NoventisImputer
 from .data_cleaner.outlier_handling import NoventisOutlierHandler
 
-from .predictor.manual import NoventisManualPredictor
+from .predictor.manual import NoventisManualML
 from .predictor.auto import NoventisAutoML
 
 __all__ = [
@@ -18,6 +18,6 @@ __all__ = [
     "NoventisScaler",
     "NoventisImputer",
     "NoventisOutlierHandler",
-    "NoventisManualPredictor",  
+    "NoventisManualML",  
     "NoventisAutoML",
 ]
