@@ -1856,13 +1856,13 @@ class NoventisManualML:
         training_time = self.best_model_info.get('training_time_seconds', 0)
         best_params_str = str(self.best_model_info.get('best_params', 'Default'))
         
-        # Generate metrics HTML
-        color_map = {
-            'mae': '#FFB86C',
-            'mse': '#FF79C6',
-            'rmse': '#8BE9FD',
-            'r2': '#50FA7B'
-        }
+        # # Generate metrics HTML
+        # color_map = {
+        #     'mae': '#FFB86C',
+        #     'mse': '#FF79C6',
+        #     'rmse': '#8BE9FD',
+        #     'r2': '#50FA7B'
+        # }
         all_metrics_html = ""
 
         for metric_name, metric_value in self.best_model_info['metrics'].items():
