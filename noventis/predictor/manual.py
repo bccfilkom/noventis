@@ -14,6 +14,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from IPython.display import display, HTML
 
+from noventis import data_cleaner 
+from noventis.data_cleaner import NoventisDataCleaner
+
 warnings.filterwarnings('ignore')
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -212,7 +215,8 @@ class NoventisManualML:
         model_name: Union[str, List[str]],
         task: str,
         random_state: int = 42,
-        data_cleaner: Optional[Any] = None,
+        data_cleaner_object: Optional[Any] = None,
+        data_cleaner_bool: bool = False,
         tune_hyperparameters: bool = False,
         n_trials: int = 50,
         cv_folds: int = 3,
@@ -220,31 +224,95 @@ class NoventisManualML:
         cv_strategy: str = 'repeated',
         show_tuning_plots: bool = False,
         output_dir: Optional[str] = None
-    ):
+    ) -> None:
         """
-        Initialize ManualPredictor instance.
+        Initialize NoventisManualML instance.
         
         Args:
-            model_name: Single model name or list of models to train
-            task: Task type ('classification' or 'regression')
-            random_state: Random seed for reproducibility
-            data_cleaner: Optional external data cleaning pipeline
-            tune_hyperparameters: Whether to perform Optuna hyperparameter tuning
-            n_trials: Number of Optuna trials for tuning
-            cv_folds: Number of cross-validation folds
-            enable_feature_engineering: Whether to create polynomial features
-            cv_strategy: CV strategy ('repeated' or 'standard')
-            show_tuning_plots: Whether to display Optuna optimization visualizations
-            output_dir: Directory to save results, models, and reports
+            model_name (Union[str, List[str]]): 
+                Name(s) of model(s) to train. 
+                Supported classification models: 'logistic_regression', 'decision_tree', 
+                'random_forest', 'gradient_boosting', 'xgboost', 'lightgbm', 'catboost'
+                Supported regression models: 'linear_regression', 'decision_tree', 
+                'random_forest', 'gradient_boosting', 'xgboost', 'lightgbm', 'catboost'
+                Default: None
             
+            task (str):
+                Type of machine learning task.
+                Must be one of: 'classification', 'regression'
+                Default: None
+            
+            random_state (int):
+                Random seed for reproducibility.
+                Controls randomness in train-test split, cross-validation, and models.
+                Default: 42
+            
+            data_cleaner_object (Optional[Any]):
+                External DataCleaner object (e.g., NoventisDataCleaner instance).
+                If provided, will be used for data preprocessing before model training.
+                Must have either fit_transform() or fit()/transform() methods.
+                Default: None
+            
+            data_cleaner_bool (bool):
+                Flag to use built-in NoventisDataCleaner from noventis package.
+                Only used if data_cleaner_object is not provided.
+                Default: False
+            
+            tune_hyperparameters (bool):
+                Whether to perform Bayesian hyperparameter optimization using Optuna.
+                If True, will search for optimal hyperparameters for each model.
+                Default: False
+            
+            n_trials (int):
+                Number of trials for Optuna hyperparameter search.
+                Higher values may find better parameters but take longer.
+                Only used if tune_hyperparameters=True.
+                Default: 50
+            
+            cv_folds (int):
+                Number of cross-validation folds.
+                Used for both hyperparameter tuning and model evaluation.
+                Must be >= 2.
+                Default: 3
+            
+            enable_feature_engineering (bool):
+                Whether to enable automated feature engineering (polynomial features, etc).
+                Currently disabled for stability reasons.
+                Default: False
+            
+            cv_strategy (str):
+                Cross-validation strategy for classification tasks.
+                Options: 'repeated' (RepeatedStratifiedKFold), 'standard' (StratifiedKFold)
+                Default: 'repeated'
+            
+            show_tuning_plots (bool):
+                Whether to display Optuna optimization visualizations during tuning.
+                Includes optimization history and parameter importance plots.
+                Default: False
+            
+            output_dir (Optional[str]):
+                Base directory for saving outputs (plots, models, reports).
+                If provided, creates timestamped subdirectories.
+                Default: None
+        
         Raises:
             ValueError: If task is not 'classification' or 'regression'
+        
+        Returns:
+            None
+        
+        Note:
+            The predictor will be in an untrained state after initialization.
+            Call fit() method to train models.
         """
         self._report_id = f"report-{id(self)}"
         self.model_name = model_name
-        self.task_type = task.lower()  # Renamed from self.task to match AutoML
+        self.task_type = task.lower()
         self.random_state = random_state
-        self.data_cleaner = data_cleaner
+        
+        self.data_cleaner_object = data_cleaner_object
+        self.data_cleaner_bool = data_cleaner_bool
+        
         self.tune_hyperparameters = tune_hyperparameters
         self.n_trials = n_trials
         self.cv_folds = cv_folds
@@ -253,40 +321,52 @@ class NoventisManualML:
         self.show_tuning_plots = show_tuning_plots
         self.output_dir = self._setup_output_directory(output_dir)
 
-        # Result storage matching AutoML structure
         self.results = {}
         self.best_model_info: Dict[str, Any] = {}
         self.all_results: List[Dict[str, Any]] = []
         
-        # Data storage matching AutoML naming
         self.X_train = None
         self.X_test = None
         self.y_train = None
         self.y_test = None
         self.preprocessor: Optional[ColumnTransformer] = None
+        
+        self.data_cleaner_used = False
+        self.cleaner_instance = None
 
-        # Validate task type
         if self.task_type not in ['classification', 'regression']:
             raise ValueError(
                 f"Task must be 'classification' or 'regression', got '{task}'"
             )
         
-        logging.info(f"ManualPredictor initialized for {self.task_type}")
+        logging.info(f"NoventisManualML initialized for {self.task_type}")
 
     def _setup_output_directory(self, output_dir: Optional[str]) -> Optional[str]:
         """
         Create organized directory structure for outputs.
         
-        Creates timestamped run directory with subdirectories:
-        - plots/: Visualization images
-        - models/: Saved model files
-        - reports/: HTML and text reports
-        
         Args:
-            output_dir: Base output directory path
-            
+            output_dir (Optional[str]):
+                Base output directory path. If None, no directory structure is created.
+                Default: None
+        
         Returns:
-            Path to created run directory, or None if output_dir not specified
+            Optional[str]:
+                Path to created run directory containing subdirectories:
+                - plots/: Visualization images
+                - models/: Saved model files
+                - reports/: HTML and text reports
+                Returns None if output_dir is not specified.
+        
+        Raises:
+            OSError: If directory creation fails due to permission issues
+        
+        Example:
+            >>> output_dir = ml._setup_output_directory('/tmp/ml_output')
+            >>> # Creates: /tmp/ml_output/run_20240115_143022/
+            >>> #          ├── plots/
+            >>> #          ├── models/
+            >>> #          └── reports/
         """
         if not output_dir:
             return None
@@ -608,123 +688,339 @@ class NoventisManualML:
         compare: bool = False,
         explain: bool = False,
         chosen_metric: Optional[str] = None,
-        display_report: bool = True
+        display_report: bool = True,
+        use_data_cleaner: bool = False,
+        data_cleaner_object: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
-        Main training pipeline (renamed from run_pipeline to match AutoML).
+        Train machine learning models with optional preprocessing and hyperparameter tuning.
         
-        Complete workflow:
-        1. Train-test split with stratification
-        2. External data cleaning (if provided)
-        3. Internal preprocessing (imputation + encoding)
-        4. Model training for all specified models
-        5. Best model selection
-        6. Optional: Comparison table, visualizations, HTML report
+        This is the main entry point for the ML pipeline. It handles:
+        1. Data splitting (with stratification for classification)
+        2. Optional data cleaning (via DataCleaner or built-in)
+        3. Internal preprocessing (imputation and encoding)
+        4. Hyperparameter tuning (if enabled)
+        5. Model training and evaluation
+        6. Result reporting
         
         Args:
-            df: Input DataFrame with features and target
-            target_column: Name of target column
-            test_size: Proportion of data for testing (0.0-1.0)
-            compare: Whether to print comparison table
-            explain: Whether to create metric visualization plots
-            chosen_metric: Specific metric to visualize (uses primary if None)
-            display_report: Whether to display HTML report in notebook
+            df (pd.DataFrame):
+                Input DataFrame containing features and target column.
+                Must be a valid pandas DataFrame with at least 2 columns.
+                All data types supported by sklearn preprocessing are accepted.
+                Default: None (required)
             
-        Returns:
-            Dictionary with 'best_model_details' and 'all_model_results'
+            target_column (str):
+                Name of the target column in df.
+                Must exist in df.columns.
+                For classification: can be any type (will be label encoded if needed)
+                For regression: should be numeric
+                Default: None (required)
             
-        Raises:
-            RuntimeError: If no models train successfully
-        """
-        logging.info("Starting ManualPredictor Training Pipeline")
-
+            test_size (float):
+                Proportion of data to use for testing.
+                Must be between 0.0 and 1.0.
+                Training data size = 1 - test_size
+                Default: 0.2 (20% test, 80% train)
+            
+            compare (bool):
+                Whether to print formatted comparison table of all models.
+                Displays metrics for each trained model.
+                Default: False
+            
+            explain (bool):
+                Whether to create and display metric comparison plot.
+                Shows bar chart with model performance comparison.
+                Default: False
+            
+            chosen_metric (Optional[str]):
+                Specific metric to plot when explain=True.
+                If None, uses primary metric (f1_score for classification, r2_score for regression).
+                Must be a metric key from results.
+                Default: None
+            
+            display_report (bool):
+                Whether to display HTML report in notebook output.
+                Only works in Jupyter/Colab environments.
+                Default: True
+            
+            use_data_cleaner (bool):
+                Whether to use built-in NoventisDataCleaner from noventis package.
+                Ignored if data_cleaner_object is provided.
+                Default: False
+            
+            data_cleaner_object (Optional[Any]):
+                External DataCleaner instance to use for preprocessing.
+                Takes precedence over use_data_cleaner flag.
+                Must have fit_transform() or fit()/transform() methods.
+                Default: None
         
-        # Separate features and target
+        Returns:
+            Dict[str, Any]:
+                Dictionary containing:
+                {
+                    'best_model_details': Dict with best model info (model, metrics, etc),
+                    'all_model_results': List of results for all trained models
+                }
+                
+                Each model result includes:
+                {
+                    'model_name': str,
+                    'model': trained model object,
+                    'predictions': np.ndarray,
+                    'actual': pd.Series,
+                    'metrics': Dict[str, float],
+                    'training_time_seconds': float,
+                    'best_params': Dict (if tuning was enabled),
+                    'task_type': str
+                }
+        
+        Raises:
+            TypeError: If df is not a pandas DataFrame
+            ValueError: If target_column not in df.columns
+            ValueError: If test_size not in range (0, 1)
+            RuntimeError: If no models were trained successfully
+            ImportError: If use_data_cleaner=True but noventis package not installed
+        
+        Example:
+            >>> results = ml.fit(
+            ...     df=df_titanic,
+            ...     target_column='survived',
+            ...     test_size=0.2,
+            ...     compare=True,
+            ...     use_data_cleaner=True,
+            ...     display_report=True
+            ... )
+            >>> print(results['best_model_details']['model_name'])
+            'xgboost'
+        
+        Note:
+            - Data is automatically stratified by target for classification tasks
+            - Models are evaluated using cross-validation during hyperparameter tuning
+            - Best model is selected based on primary metric
+            - All results are stored in self.all_results and self.results
+        """
+        logging.info("Starting NoventisManualML Training Pipeline")
+        
+        # Validate inputs
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError(f"df must be pandas DataFrame, got {type(df)}")
+        
+        if target_column not in df.columns:
+            raise ValueError(f"target_column '{target_column}' not found in DataFrame")
+        
+        if not 0 < test_size < 1:
+            raise ValueError(f"test_size must be between 0 and 1, got {test_size}")
+        
         X = df.drop(columns=[target_column])
         y = df[target_column]
-
-        # Train-test split with stratification for classification
+        
+        # Determine which data cleaner to use
+        cleaner_to_use = data_cleaner_object or self.data_cleaner_object
+        use_builtin = use_data_cleaner or self.data_cleaner_bool
+        
+        self.data_cleaner_used = False
+        self.cleaner_instance = None
+        
         stratify = y if self.task_type == 'classification' else None
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, 
-            test_size=test_size, 
-            random_state=self.random_state, 
-            stratify=stratify
-        )
         
-        logging.info(f"Data split: Train={len(X_train)}, Test={len(X_test)}")
+        # SCENARIO 1: External DataCleaner object provided
+        if cleaner_to_use is not None:
+            logging.info("External DataCleaner object detected. Applying transformations...")
+            
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, 
+                test_size=test_size, 
+                random_state=self.random_state, 
+                stratify=stratify
+            )
+            
+            try:
+                if hasattr(cleaner_to_use, 'fit_transform'):
+                    X_train = cleaner_to_use.fit_transform(X_train, y_train)
+                    X_test = cleaner_to_use.transform(X_test)
+                elif hasattr(cleaner_to_use, 'fit') and hasattr(cleaner_to_use, 'transform'):
+                    cleaner_to_use.fit(X_train, y_train)
+                    X_train = cleaner_to_use.transform(X_train)
+                    X_test = cleaner_to_use.transform(X_test)
+                else:
+                    raise AttributeError("Cleaner must have fit_transform or fit/transform methods")
+                
+                self.data_cleaner_used = True
+                self.cleaner_instance = cleaner_to_use
+                logging.info("External DataCleaner processing complete.")
+                
+            except Exception as e:
+                logging.error(f"External DataCleaner failed: {e}")
+                logging.info("Falling back to internal preprocessing only.")
+                self.data_cleaner_used = False
         
-        # Apply external data cleaner if provided
-        if self.data_cleaner and NoventisDataCleaner is not None:
-            logging.info("External DataCleaner detected. Applying transformations...")
-            self.data_cleaner.fit(X_train, y_train)
-            X_train = self.data_cleaner.transform(X_train)
-            X_test = self.data_cleaner.transform(X_test)
-            logging.info("External DataCleaner processing complete.")
+        # SCENARIO 2: Built-in NoventisDataCleaner requested
+        elif use_builtin:
+            logging.info("Creating built-in NoventisDataCleaner...")
+            
+            try:
+                try:
+                    from noventis.data_cleaner import data_cleaner as dc_func
+                except ImportError:
+                    from noventis import data_cleaner as dc_func
+                
+                # FIXED: Apply cleaner on full dataset BEFORE split
+                df_with_target = X.copy()
+                df_with_target[target_column] = y
+                
+                df_cleaned, cleaner_instance = dc_func(
+                    data=df_with_target,
+                    return_instance=True,
+                    target_column=target_column,
+                    verbose=False
+                )
+                
+                # Extract cleaned features and target
+                X_cleaned = cleaner_instance._processed_df.drop(columns=[target_column], errors='ignore')
+                y_cleaned = df_cleaned[target_column] if target_column in df_cleaned.columns else y.loc[X_cleaned.index]
+                
+                # Ensure alignment
+                if len(X_cleaned) != len(y_cleaned):
+                    # Keep only matching indices
+                    common_idx = X_cleaned.index.intersection(y_cleaned.index)
+                    X_cleaned = X_cleaned.loc[common_idx]
+                    y_cleaned = y_cleaned.loc[common_idx]
+                
+                # NOW do train-test split
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X_cleaned, y_cleaned, 
+                    test_size=test_size, 
+                    random_state=self.random_state, 
+                    stratify=y_cleaned if self.task_type == 'classification' else None
+                )
+                
+                self.data_cleaner_used = True
+                self.cleaner_instance = cleaner_instance
+                logging.info("Built-in DataCleaner processing complete.")
+                
+            except Exception as e:
+                logging.error(f"Built-in DataCleaner failed: {e}")
+                logging.info("Falling back to internal preprocessing only.")
+                
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, 
+                    test_size=test_size, 
+                    random_state=self.random_state, 
+                    stratify=stratify
+                )
         
-        # Internal preprocessing pipeline
-        logging.info("Running internal preprocessor...")
+        # SCENARIO 3: No external cleaning
+        else:
+            logging.info("No external DataCleaner provided. Using standard preprocessing.")
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, 
+                test_size=test_size, 
+                random_state=self.random_state, 
+                stratify=stratify
+            )
+        
+        logging.info(f"Data split complete: Train={len(X_train)}, Test={len(X_test)}")
+        
+        # ========== INTERNAL PREPROCESSING ==========
+        logging.info("Applying internal preprocessing (imputation + encoding)...")
+        
         numeric_features = X_train.select_dtypes(include=np.number).columns.tolist()
         categorical_features = X_train.select_dtypes(exclude=np.number).columns.tolist()
-
-        self.preprocessor = ColumnTransformer(
-            transformers=[
-                ('num', SimpleImputer(strategy='median'), numeric_features),
-                ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
-            ],
-            remainder='passthrough'
-        )
-
-        self.preprocessor.fit(X_train)
-        X_train_transformed = self.preprocessor.transform(X_train)
-        X_test_transformed = self.preprocessor.transform(X_test)
-        logging.info("Internal preprocessing complete. All data is now numeric.")
         
-        # Feature engineering (currently disabled for stability)
+        logging.info(f"Numeric features: {len(numeric_features)}, Categorical features: {len(categorical_features)}")
+        
+        transformers = []
+        
+        if numeric_features:
+            transformers.append(
+                ('num', SimpleImputer(strategy='median'), numeric_features)
+            )
+        
+        if categorical_features:
+            transformers.append(
+                ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
+            )
+        
+        if not transformers:
+            logging.warning("No features to transform. Using data as-is.")
+            X_train_transformed = X_train.values
+            X_test_transformed = X_test.values
+        else:
+            self.preprocessor = ColumnTransformer(
+                transformers=transformers,
+                remainder='passthrough'
+            )
+            
+            X_train_transformed = self.preprocessor.fit_transform(X_train)
+            X_test_transformed = self.preprocessor.transform(X_test)
+            
+            logging.info(f"Preprocessing complete. Final shape: {X_train_transformed.shape}")
+        
         if self.enable_feature_engineering:
-            logging.warning("Feature engineering is currently disabled for stability.")
+            logging.warning("Feature engineering is currently disabled for stability reasons.")
         
-        # Store processed data matching AutoML naming
         self.X_train = X_train_transformed
         self.X_test = X_test_transformed
         self.y_train = y_train
         self.y_test = y_test
-
-        # Train all specified models
+        
+        # ========== MODEL TRAINING ==========
+        logging.info("Starting model training phase...")
+        
         model_list = (
             self.model_name 
             if isinstance(self.model_name, list) 
             else [self.model_name]
         )
+        
         self.all_results = []
         
-        for name in model_list:
+        for idx, name in enumerate(model_list, 1):
+            logging.info(f"Training model {idx}/{len(model_list)}: {name.upper()}")
+            
             try:
                 result = self._run_single_model_pipeline(
-                    name, self.X_train, y_train, self.X_test, y_test
+                    name, 
+                    self.X_train, 
+                    y_train, 
+                    self.X_test, 
+                    y_test
                 )
                 self.all_results.append(result)
-                self.results[name] = result  # Store in results dict
+                self.results[name] = result
+                
+                metrics_str = ", ".join([
+                    f"{k}={v:.4f}" 
+                    for k, v in result['metrics'].items()
+                ])
+                logging.info(f"✓ {name.upper()} trained successfully: {metrics_str}")
                 
             except Exception as e:
-                logging.error(f"Failed to process model {name}: {e}")
+                logging.error(f"✗ Failed to train {name.upper()}: {str(e)}")
                 self.all_results.append({
                     'model_name': name, 
                     'metrics': {}, 
                     'error': str(e)
                 })
-
-        # Check if any models succeeded
+        
+        # ========== RESULT VALIDATION ==========
         successful_results = [
-            res for res in self.all_results if 'error' not in res
+            res for res in self.all_results 
+            if 'error' not in res and res.get('metrics')
         ]
+        
         if not successful_results:
+            error_details = [
+                f"{res['model_name']}: {res.get('error', 'Unknown error')}"
+                for res in self.all_results if 'error' in res
+            ]
             raise RuntimeError(
-                "No models were trained successfully. "
-                "Please check your data or configuration."
+                f"No models were trained successfully. Errors:\n" + 
+                "\n".join(error_details)
             )
-
-        # Select best model based on primary metric
+        
+        # ========== BEST MODEL SELECTION ==========
         primary_metric = (
             self.DEFAULT_CLASSIFICATION_METRIC 
             if self.task_type == 'classification' 
@@ -733,28 +1029,68 @@ class NoventisManualML:
         
         self.best_model_info = max(
             successful_results, 
-            key=lambda x: x['metrics'].get(primary_metric, -1)
+            key=lambda x: x['metrics'].get(primary_metric, -float('inf'))
         )
         
-       
-        logging.info("Process Complete!")
-        logging.info(
-            f"Best Model: {self.best_model_info['model_name'].upper()} "
-            f"with {primary_metric} = {self.best_model_info['metrics'][primary_metric]:.4f}"
-        )
-
-        # Optional outputs
+        best_score = self.best_model_info['metrics'][primary_metric]
+        best_name = self.best_model_info['model_name']
+        
+        logging.info("=" * 60)
+        logging.info("TRAINING COMPLETE!")
+        logging.info(f"Best Model: {best_name.upper()}")
+        logging.info(f"Best {primary_metric}: {best_score:.4f}")
+        logging.info(f"Successfully trained: {len(successful_results)}/{len(model_list)} models")
+        logging.info("=" * 60)
+        
         if compare:
             self._print_comparison()
+        
         if explain:
             self._create_metric_plot(chosen_metric)
+        
         if display_report:
-            self.display_report()
-
+            try:
+                self.display_report()
+            except Exception as e:
+                logging.warning(f"Could not display report: {e}")
+        
         return {
             'best_model_details': self.best_model_info,
             'all_model_results': self.all_results
         }
+
+    def _get_preprocessor_info(self) -> str:
+        """
+        Get formatted information about preprocessor configuration.
+        
+        Args:
+            None
+        
+        Returns:
+            str:
+                Description of preprocessing pipeline.
+                Format: "Numeric: SimpleImputer | Categorical: OneHotEncoder"
+                Returns "No preprocessor (raw data)" if preprocessor is None
+                Returns "Standard" if transformers exist but cannot be parsed
+        
+        Example:
+            >>> info = ml._get_preprocessor_info()
+            >>> print(info)
+            'Numeric: SimpleImputer | Categorical: OneHotEncoder'
+        """
+        if self.preprocessor is None:
+            return "No preprocessor (raw data)"
+        
+        transformers = self.preprocessor.transformers_
+        info_parts = []
+        
+        for name, transformer, columns in transformers:
+            if name == 'num':
+                info_parts.append(f"Numeric: {transformer.__class__.__name__}")
+            elif name == 'cat':
+                info_parts.append(f"Categorical: {transformer.__class__.__name__}")
+        
+        return " | ".join(info_parts) if info_parts else "Standard"
 
     def get_results_dataframe(self) -> pd.DataFrame:
         """
@@ -1486,10 +1822,27 @@ class NoventisManualML:
 
     def _get_summary_html(self) -> str:
         """
-        Generate HTML for summary section of report.
+        Generate HTML for summary section of report with detailed information.
+        
+        Args:
+            None
         
         Returns:
-            HTML string with process summary and best model information
+            str:
+                Complete HTML string containing:
+                - Process Summary card (task, models, CV settings, cleaner status)
+                - Best Model card (model name, primary metric, training time)
+                - All Metrics card (grid of all evaluation metrics)
+                - Best Hyperparameters card (parameter values in code block)
+                - Dataset Information card (samples, features, distribution)
+                - Data Processing Pipeline card (preprocessing method, cleaner info)
+        
+        Raises:
+            None
+        
+        Example:
+            >>> html = ml._get_summary_html()
+            >>> # Returns HTML with 6 grid cards containing training summary
         """
         if not self.best_model_info:
             return "<p>No results available to display.</p>"
@@ -1504,14 +1857,40 @@ class NoventisManualML:
         best_params_str = str(self.best_model_info.get('best_params', 'Default'))
         
         # Generate metrics HTML
+        color_map = {
+            'mae': '#FFB86C',
+            'mse': '#FF79C6',
+            'rmse': '#8BE9FD',
+            'r2': '#50FA7B'
+        }
         all_metrics_html = ""
+
         for metric_name, metric_value in self.best_model_info['metrics'].items():
+            color = color_map.get(metric_name.lower(), '#FFB86C')
             all_metrics_html += f"""
-                <div class='metric-item'>
-                    <span class='metric-label'>{metric_name.replace('_', ' ').title()}</span>
-                    <span class='metric-value'>{metric_value:.4f}</span>
+                <div class='metric-item' style="border-color:{color};">
+                    <span class='metric-label' style="color:{color};">
+                        {metric_name.replace('_', ' ').title()}
+                    </span>
+                    <span class='metric-value' style="color:{color};">
+                        {metric_value:.4f}
+                    </span>
                 </div>
             """
+
+        # Determine cleaner status
+        cleaner_status = "Yes ✓" if self.data_cleaner_used else "No"
+        cleaner_color = "#3FB950" if self.data_cleaner_used else "#8B949E"
+        
+        cleaner_info = ""
+        if self.data_cleaner_used and self.cleaner_instance:
+            cleaner_type = type(self.cleaner_instance).__name__
+            cleaner_info = f"""
+                <p><strong>Cleaner Type:</strong> {cleaner_type}</p>
+                <p><strong>Cleaner Quality Score:</strong> {self.cleaner_instance.quality_score_.get('final_score', 'N/A')}</p>
+            """
+        elif self.data_cleaner_used and not self.cleaner_instance:
+            cleaner_info = "<p><strong>Cleaner Type:</strong> External DataCleaner (type unknown)</p>"
         
         return f"""
         <div class="grid-container">
@@ -1523,13 +1902,14 @@ class NoventisManualML:
                 <p><strong>CV Folds:</strong> {self.cv_folds}</p>
                 <p><strong>Hyperparameter Tuning:</strong> {'Enabled' if self.tune_hyperparameters else 'Disabled'}</p>
                 {f"<p><strong>Tuning Trials:</strong> {self.n_trials}</p>" if self.tune_hyperparameters else ""}
-                <p><strong>Data Cleaner Used:</strong> {'Yes' if self.data_cleaner else 'No'}</p>
+                <p><strong>Data Cleaner Used:</strong> <span style="color: {cleaner_color}; font-weight: bold; font-size: 1.1em;">{cleaner_status}</span></p>
+                {cleaner_info}
             </div>
             <div class="grid-item score-card">
                 <h4>Best Model</h4>
                 <p class="model-name">{self.best_model_info['model_name'].upper()}</p>
                 <p class="metric-score">{primary_metric.replace('_', ' ').title()}: {best_score:.4f}</p>
-                <p class="training-time">Training Time: {training_time:.2f}s</p>
+                <p class="training-time">⏱ Training Time: {training_time:.2f}s</p>
             </div>
             <div class="grid-item">
                 <h4>All Metrics for Best Model</h4>
@@ -1543,15 +1923,22 @@ class NoventisManualML:
             </div>
             <div class="grid-item">
                 <h4>Dataset Information</h4>
-                <p><strong>Training Samples:</strong> {self.X_train.shape[0]}</p>
-                <p><strong>Test Samples:</strong> {self.X_test.shape[0]}</p>
+                <p><strong>Training Samples:</strong> {self.X_train.shape[0]:,}</p>
+                <p><strong>Test Samples:</strong> {self.X_test.shape[0]:,}</p>
                 <p><strong>Number of Features:</strong> {self.X_train.shape[1]}</p>
-                <p><strong>Target Distribution (Train):</strong></p>
-                <pre class="params-box">{self.y_train.value_counts().to_dict()}</pre>
+                <p><strong>Test Split Size:</strong> {(self.X_test.shape[0] / (self.X_train.shape[0] + self.X_test.shape[0]) * 100):.1f}%</p>
+                <p style="margin-top: 15px;"><strong>Target Distribution (Train):</strong></p>
+                <pre class="params-box">{str(self.y_train.value_counts().to_dict())}</pre>
+            </div>
+            <div class="grid-item">
+                <h4>Data Processing Pipeline</h4>
+                <p><strong>Preprocessing Method:</strong> {self._get_preprocessor_info()}</p>
+                <p><strong>Data Cleaner:</strong> <span style="color: {cleaner_color}; font-weight: bold;">{cleaner_status}</span></p>
+                <p><strong>Internal Preprocessing:</strong> Enabled (Imputation + Encoding)</p>
+                <p><strong>Feature Engineering:</strong> {'Enabled' if self.enable_feature_engineering else 'Disabled'}</p>
             </div>
         </div>
         """
-
     def _get_comparison_table_html(self) -> str:
         """
         Generate HTML comparison table of all trained models.
@@ -1666,223 +2053,318 @@ class NoventisManualML:
         return plots_html
 
     def generate_html_report(self, filepath: Optional[str] = None) -> str:
-        """
-        Generate comprehensive interactive HTML report.
-        
-        Creates professional dark-themed report with:
-        - Executive summary with key metrics
-        - Detailed model comparison table
-        - Comprehensive visualizations
-        - Interactive tabbed navigation
-        
-        Args:
-            filepath: Path to save HTML file. If None, returns HTML string only
-            
-        Returns:
-            Complete HTML string
-        """
+        """Generate comprehensive interactive HTML report with FIXED scoping."""
         if not self.best_model_info:
             msg = "Report cannot be generated. Please run the pipeline first using .fit()."
             logging.error(msg)
             return f"<p>{msg}</p>"
         
-        # Generate report sections
         summary_html = self._get_summary_html()
         comparison_table_html = self._get_comparison_table_html()
         plots_html = self._get_plots_html()
 
+        # FIXED: Use unique report ID for CSS scoping
         report_id = self._report_id
         
-        # Complete HTML template with FIXED CSS selectors
         html_template = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Manual Predictor Report</title>
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Exo+2:wght@700&display=swap');
-            .{report_id} {{
-                --bg-dark-1: #0D1117; --bg-dark-2: #161B22; --border-color: #30363D;
-                --primary-blue: #58A6FF; --primary-orange: #F78166;
-                --text-light: #C9D1D9; --text-medium: #8B949E;
-                font-family: 'Roboto', sans-serif; background-color: var(--bg-dark-1);
-                color: var(--text-light); line-height: 1.6;
-            }}
-            .{report_id} * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-            .{report_id} .container {{
-                max-width: 1400px; margin: auto; background-color: var(--bg-dark-2);
-                border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;
-            }}
-            .{report_id} header {{
-                padding: 30px; background: linear-gradient(135deg, #1A2D40 0%, #0D1117 100%);
-                text-align: center; border-bottom: 2px solid var(--border-color);
-            }}
-            .{report_id} header h1 {{ font-family: 'Exo 2', sans-serif; color: var(--primary-blue); 
-                        margin: 0; font-size: 2.5rem; text-shadow: 0 2px 10px rgba(88, 166, 255, 0.3); }}
-            .{report_id} header p {{ margin: 10px 0 0; color: var(--text-medium); font-size: 1.1rem; }}
-            .{report_id} .navbar {{ display: flex; background-color: var(--bg-dark-2); 
-                    border-bottom: 1px solid var(--border-color); overflow-x: auto; }}
-            .{report_id} .nav-btn {{
-                background: none; border: none; color: var(--text-medium);
-                padding: 15px 25px; cursor: pointer; font-size: 16px;
-                border-bottom: 3px solid transparent; transition: all 0.3s;
-                white-space: nowrap;
-            }}
-            .{report_id} .nav-btn:hover {{ color: var(--text-light); background-color: rgba(88, 166, 255, 0.1); }}
-            .{report_id} .nav-btn.active {{ color: var(--primary-orange); border-bottom-color: var(--primary-orange); 
-                            font-weight: 700; }}
-            .{report_id} .content-section {{ padding: 30px; display: none; animation: fadeIn 0.5s; }}
-            .{report_id} .content-section.active {{ display: block; }}
-            @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(10px); }} 
-                                to {{ opacity: 1; transform: translateY(0); }} }}
-            .{report_id} h2 {{ font-family: 'Exo 2'; color: var(--primary-orange); font-size: 2rem; 
-                margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--border-color); }}
-            .{report_id} h4 {{ color: var(--primary-blue); margin: 20px 0 15px; font-size: 1.3rem; }}
-            .{report_id} .grid-container {{
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-                gap: 20px; margin-bottom: 30px;
-            }}
-            .{report_id} .grid-item {{
-                background-color: var(--bg-dark-1); padding: 20px;
-                border-radius: 8px; border: 1px solid var(--border-color);
-                transition: transform 0.3s, box-shadow 0.3s;
-            }}
-            .{report_id} .grid-item:hover {{ transform: translateY(-5px); 
-                            box-shadow: 0 5px 20px rgba(88, 166, 255, 0.2); }}
-            .{report_id} .grid-item h4 {{ margin-top: 0; color: var(--primary-blue); 
-                            border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }}
-            .{report_id} .grid-item p {{ color: var(--text-medium); margin: 10px 0; }}
-            .{report_id} .grid-item strong {{ color: var(--text-light); }}
-            .{report_id} .score-card {{
-                text-align: center; background: linear-gradient(145deg, #1A2D40, #101820);
-                border: 2px solid var(--primary-orange);
-            }}
-            .{report_id} .score-card .model-name {{
-                font-family: 'Exo 2'; font-size: 2.2em;
-                color: var(--primary-orange); margin: 15px 0;
-                text-shadow: 0 2px 10px rgba(247, 129, 102, 0.5);
-            }}
-            .{report_id} .score-card .metric-score {{ font-size: 1.6em; color: var(--primary-blue); 
-                                        margin: 10px 0; font-weight: 700; }}
-            .{report_id} .score-card .training-time {{ font-size: 1.1em; color: var(--text-medium); margin-top: 10px; }}
-            .{report_id} .metrics-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }}
-            .{report_id} .metric-item {{ display: flex; justify-content: space-between; padding: 8px 12px;
-                        background-color: var(--bg-dark-2); border-radius: 4px;
-                        border: 1px solid var(--border-color); }}
-            .{report_id} .metric-label {{ color: var(--text-medium); font-size: 0.9em; }}
-            .{report_id} .metric-value {{ color: var(--primary-blue); font-weight: 700; }}
-            .{report_id} .params-box {{
-                background-color: #010409; padding: 15px; border-radius: 4px;
-                font-family: 'Courier New', monospace; font-size: 0.9em;
-                white-space: pre-wrap; word-wrap: break-word; color: var(--text-light);
-                border: 1px solid var(--border-color); margin-top: 10px;
-                max-height: 200px; overflow-y: auto;
-            }}
-            .{report_id} .params-box::-webkit-scrollbar {{ width: 8px; }}
-            .{report_id} .params-box::-webkit-scrollbar-track {{ background: var(--bg-dark-1); }}
-            .{report_id} .params-box::-webkit-scrollbar-thumb {{ background: var(--border-color); border-radius: 4px; }}
-            .{report_id} .table-container {{ overflow-x: auto; margin-top: 20px; }}
-            .{report_id} .table-container table {{
-                width: 100%; border-collapse: collapse; background-color: var(--bg-dark-1);
-                border-radius: 8px; overflow: hidden;
-            }}
-            .{report_id} .table-container th, .{report_id} .table-container td {{
-                padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color);
-            }}
-            .{report_id} .table-container thead {{ background-color: #1A2D40; }}
-            .{report_id} .table-container tbody tr:hover {{ background-color: #222b38; }}
-            .{report_id} .plot-container {{
-                background-color: var(--bg-dark-1); padding: 20px; border-radius: 8px;
-                border: 1px solid var(--border-color); margin: 20px 0;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            }}
-            .{report_id} .plot-container img {{ max-width: 100%; height: auto; display: block; margin: auto; 
-                                border-radius: 4px; }}
-            .{report_id} .info-box {{
-                background: linear-gradient(135deg, rgba(88, 166, 255, 0.1), rgba(22, 27, 34, 0.5));
-                border-left: 4px solid var(--primary-blue); padding: 15px 20px;
-                margin: 20px 0; border-radius: 4px;
-            }}
-            .{report_id} .info-box p {{ margin: 5px 0; color: var(--text-light); }}
-            .{report_id} .shap-interpretation {{
-                background-color: var(--bg-dark-1); 
-                padding: 20px; 
-                border-radius: 8px;
-                border: 1px solid var(--border-color); 
-                margin: 20px 0;
-            }}
-            .{report_id} .shap-interpretation h5 {{
-                margin-top: 0;
-                font-size: 1.3em;
-            }}
-            .{report_id} .shap-interpretation h6 {{
-                font-size: 1.1em;
-            }}
-            .{report_id} .shap-interpretation li {{
-                line-height: 1.6;
-            }}
-            @media (max-width: 768px) {{
-                .{report_id} .grid-container {{ grid-template-columns: 1fr; }}
-                .{report_id} .navbar {{ flex-direction: column; }}
-                .{report_id} .nav-btn {{ width: 100%; text-align: left; }}
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="{report_id}">
-            <div class="container">
-                <header>
-                    <h1>Manual Predictor Analysis Report</h1>
-                    <p>Comprehensive Machine Learning Pipeline Results</p>
-                </header>
-                <nav class="navbar">
-                    <button class="nav-btn active" onclick="showTab(event, 'summary', '{report_id}')">Summary</button>
-                    <button class="nav-btn" onclick="showTab(event, 'comparison', '{report_id}')">Model Comparison</button>
-                    <button class="nav-btn" onclick="showTab(event, 'visualizations', '{report_id}')">Visualizations</button>
-                </nav>
-                <main>
-                    <section id="summary" class="content-section active">
-                        <h2>Execution Summary</h2>
-                        {summary_html}
-                    </section>
-                    <section id="comparison" class="content-section">
-                        <h2>Detailed Metric Comparison</h2>
-                        <div class="info-box">
-                            <p><strong>Interpretation Guide:</strong></p>
-                            <p>Higher values indicate better performance for: Accuracy, Precision, Recall, F1 Score, R² Score</p>
-                            <p>Lower values indicate better performance for: MAE, MSE, RMSE</p>
-                        </div>
-                        {comparison_table_html}
-                    </section>
-                    <section id="visualizations" class="content-section">
-                        <h2>Result Visualizations</h2>
-                        {plots_html}
-                    </section>
-                </main>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Manual Predictor Report</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Exo+2:wght@700&display=swap');
+                
+                [data-report-id="{report_id}"] {{
+                    --bg-dark-1: #0D1117;
+                    --bg-dark-2: #161B22;
+                    --border-color: #30363D;
+                    --primary-blue: #58A6FF;
+                    --primary-orange: #F78166;
+                    --text-light: #C9D1D9;
+                    --text-medium: #8B949E;
+                    font-family: 'Roboto', sans-serif;
+                    background-color: var(--bg-dark-1);
+                    color: var(--text-light);
+                    line-height: 1.6;
+                }}
+                
+                [data-report-id="{report_id}"] * {{
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }}
+                
+                [data-report-id="{report_id}"] .container {{
+                    max-width: 1400px;
+                    margin: auto;
+                    background-color: var(--bg-dark-2);
+                    border: 1px solid var(--border-color);
+                    border-radius: 10px;
+                    overflow: hidden;
+                }}
+                
+                [data-report-id="{report_id}"] header {{
+                    padding: 30px;
+                    background: linear-gradient(135deg, #1A2D40 0%, #0D1117 100%);
+                    text-align: center;
+                    border-bottom: 2px solid var(--border-color);
+                }}
+                
+                [data-report-id="{report_id}"] header h1 {{
+                    font-family: 'Exo 2', sans-serif;
+                    color: var(--primary-blue);
+                    margin: 0;
+                    font-size: 2.5rem;
+                    text-shadow: 0 2px 10px rgba(88, 166, 255, 0.3);
+                }}
+                
+                [data-report-id="{report_id}"] header p {{
+                    margin: 10px 0 0;
+                    color: var(--text-medium);
+                    font-size: 1.1rem;
+                }}
+                
+                [data-report-id="{report_id}"] .navbar {{
+                    display: flex;
+                    background-color: var(--bg-dark-2);
+                    border-bottom: 1px solid var(--border-color);
+                    overflow-x: auto;
+                }}
+                
+                [data-report-id="{report_id}"] .nav-btn {{
+                    background: none;
+                    border: none;
+                    color: var(--text-medium);
+                    padding: 15px 25px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    border-bottom: 3px solid transparent;
+                    transition: all 0.3s;
+                    white-space: nowrap;
+                    font-family: 'Roboto', sans-serif;
+                }}
+                
+                [data-report-id="{report_id}"] .nav-btn:hover {{
+                    color: var(--text-light);
+                    background-color: rgba(88, 166, 255, 0.1);
+                }}
+                
+                [data-report-id="{report_id}"] .nav-btn.active {{
+                    color: var(--primary-orange);
+                    border-bottom-color: var(--primary-orange);
+                    font-weight: 700;
+                }}
+                
+                [data-report-id="{report_id}"] .content-section {{
+                    padding: 30px;
+                    display: none;
+                    animation: fadeIn 0.5s;
+                }}
+                
+                [data-report-id="{report_id}"] .content-section.active {{
+                    display: block;
+                }}
+                
+                @keyframes fadeIn {{
+                    from {{ opacity: 0; transform: translateY(10px); }}
+                    to {{ opacity: 1; transform: translateY(0); }}
+                }}
+                
+                [data-report-id="{report_id}"] h2 {{
+                    font-family: 'Exo 2';
+                    color: var(--primary-orange);
+                    font-size: 2rem;
+                    margin-bottom: 20px;
+                    padding-bottom: 10px;
+                    border-bottom: 2px solid var(--border-color);
+                }}
+                
+                [data-report-id="{report_id}"] h4 {{
+                    color: var(--primary-blue);
+                    margin: 20px 0 15px;
+                    font-size: 1.3rem;
+                }}
+                
+                [data-report-id="{report_id}"] .grid-container {{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                    gap: 20px;
+                    margin-bottom: 30px;
+                }}
+                
+                [data-report-id="{report_id}"] .grid-item {{
+                    background-color: var(--bg-dark-1);
+                    padding: 20px;
+                    border-radius: 8px;
+                    border: 1px solid var(--border-color);
+                    transition: transform 0.3s, box-shadow 0.3s;
+                }}
+                
+                [data-report-id="{report_id}"] .grid-item:hover {{
+                    transform: translateY(-5px);
+                    box-shadow: 0 5px 20px rgba(88, 166, 255, 0.2);
+                }}
+                
+                [data-report-id="{report_id}"] .grid-item h4 {{
+                    margin-top: 0;
+                    color: var(--primary-blue);
+                    border-bottom: 1px solid var(--border-color);
+                    padding-bottom: 10px;
+                }}
+                
+                [data-report-id="{report_id}"] .score-card {{
+                    text-align: center;
+                    background: linear-gradient(145deg, #1A2D40, #101820);
+                    border: 2px solid var(--primary-orange);
+                }}
+                
+                [data-report-id="{report_id}"] .metric-score {{
+                    font-size: 2.8em;               
+                    font-weight: 800;               
+                    color: #FFB86C;                  
+                    text-shadow: 0 0 15px rgba(255, 184, 108, 0.6); 
+                    margin: 10px 0;
+                    display: block;
+                }}
+
+                [data-report-id="{report_id}"] .score-card:hover .metric-score {{
+                    transform: scale(1.05);
+                    transition: all 0.3s ease;
+                    text-shadow: 0 0 25px rgba(255, 184, 108, 0.8);
+                }}
+
+
+                
+                [data-report-id="{report_id}"] .plot-container {{
+                    background-color: var(--bg-dark-1);
+                    padding: 20px;
+                    border-radius: 8px;
+                    border: 1px solid var(--border-color);
+                    margin: 20px 0;
+                }}
+                
+                [data-report-id="{report_id}"] .plot-container img {{
+                    max-width: 100%;
+                    height: auto;
+                    display: block;
+                    margin: auto;
+                    border-radius: 4px;
+                }}
+                
+                [data-report-id="{report_id}"] table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                }}
+                
+                [data-report-id="{report_id}"] th {{
+                    background-color: #1A2D40;
+                    color: var(--primary-blue);
+                    padding: 12px;
+                    text-align: left;
+                    font-weight: bold;
+                }}
+                
+                [data-report-id="{report_id}"] td {{
+                    padding: 10px;
+                    border-bottom: 1px solid var(--border-color);
+                }}
+
+                [data-report-id="{report_id}"] .metrics-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                    gap: 15px;
+                    margin-top: 15px;
+                }}
+
+                [data-report-id="{report_id}"] .metric-item {{
+                    background: linear-gradient(145deg, #1A2D40, #101820);
+                    border: 1px solid var(--border-color);
+                    border-radius: 10px;
+                    text-align: center;
+                    padding: 15px 10px;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+                }}
+
+                [data-report-id="{report_id}"] .metric-item:hover {{
+                    transform: translateY(-4px);
+                    box-shadow: 0 4px 15px rgba(88, 166, 255, 0.3);
+                }}
+
+                [data-report-id="{report_id}"] .metric-label {{
+                    font-weight: 600;
+                    color: var(--primary-blue);
+                    font-size: 1rem;
+                    text-transform: uppercase;
+                    margin-bottom: 5px;
+                    display: block;
+                }}
+
+                [data-report-id="{report_id}"] .metric-value {{
+                    font-size: 1.6em;
+                    font-weight: 700;
+                    color: #FFB86C;
+                    text-shadow: 0 0 10px rgba(255, 184, 108, 0.5);
+                }}
+
+            </style>
+        </head>
+        <body>
+            <div data-report-id="{report_id}">
+                <div class="container">
+                    <header>
+                        <h1>Manual Predictor Analysis Report</h1>
+                        <p>Comprehensive Machine Learning Pipeline Results</p>
+                    </header>
+                    <nav class="navbar">
+                        <button class="nav-btn active" onclick="showTab(event, 'summary', '{report_id}')">Summary</button>
+                        <button class="nav-btn" onclick="showTab(event, 'comparison', '{report_id}')">Model Comparison</button>
+                        <button class="nav-btn" onclick="showTab(event, 'visualizations', '{report_id}')">Visualizations</button>
+                    </nav>
+                    <main>
+                        <section id="summary-{report_id}" class="content-section active">
+                            <h2>Execution Summary</h2>
+                            {summary_html}
+                        </section>
+                        <section id="comparison-{report_id}" class="content-section">
+                            <h2>Detailed Metric Comparison</h2>
+                            {comparison_table_html}
+                        </section>
+                        <section id="visualizations-{report_id}" class="content-section">
+                            <h2>Result Visualizations</h2>
+                            {plots_html}
+                        </section>
+                    </main>
+                </div>
             </div>
-        </div>
-        <script>
-            function showTab(event, tabName, reportId) {{
-                const reportScope = document.querySelector('.' + reportId);
-                reportScope.querySelectorAll('.content-section').forEach(section => {{
-                    section.style.display = 'none';
-                    section.classList.remove('active');
-                }});
-                reportScope.querySelectorAll('.nav-btn').forEach(btn => {{
-                    btn.classList.remove('active');
-                }});
-                reportScope.querySelector('#' + tabName).style.display = 'block';
-                reportScope.querySelector('#' + tabName).classList.add('active');
-                event.currentTarget.classList.add('active');
-            }}
-        </script>
-    </body>
-    </html>
-            """
+            <script>
+                function showTab(event, tabName, reportId) {{
+                    const reportScope = document.querySelector('[data-report-id="' + reportId + '"]');
+                    
+                    // Hide all sections in this report
+                    reportScope.querySelectorAll('.content-section').forEach(section => {{
+                        section.classList.remove('active');
+                    }});
+                    
+                    // Remove active class from all buttons
+                    reportScope.querySelectorAll('.nav-btn').forEach(btn => {{
+                        btn.classList.remove('active');
+                    }});
+                    
+                    // Show selected section
+                    const sectionId = tabName + '-' + reportId;
+                    reportScope.querySelector('#' + sectionId).classList.add('active');
+                    
+                    // Add active class to clicked button
+                    event.currentTarget.classList.add('active');
+                }}
+            </script>
+        </body>
+        </html>
+        """
         
-        # Save to file if path provided
         if filepath:
             save_path = filepath
         elif self.output_dir:
@@ -1902,20 +2384,33 @@ class NoventisManualML:
     def display_report(self) -> None:
         """
         Display HTML report in Jupyter/Colab notebook output cell.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        
+        Raises:
+            None (logs warning if not in Jupyter/Colab environment)
+        
+        Note:
+            Requires IPython.display module (available in Jupyter/Colab)
         """
         logging.info("Preparing report for display in output cell...")
         try:
             html_content = self.generate_html_report()
-            display(HTML(html_content))
+            display(HTML(html_content))  # ✅ Langsung gunakan (sudah di-import global)
             logging.info("Report displayed successfully.")
-        except NameError:
+        except (NameError, ImportError, ModuleNotFoundError) as e:
             logging.warning(
-                "Cannot display report. Ensure you are running this in a "
-                "Jupyter/Colab environment and that 'display' and 'HTML' "
-                "from IPython.display are imported."
+                f"Cannot display report: {e}. "
+                "Ensure you are running this in a Jupyter/Colab environment."
             )
         except Exception as e:
             logging.error(f"Failed to display report: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
 
     def __repr__(self) -> str:
         """String representation of ManualPredictor instance."""
