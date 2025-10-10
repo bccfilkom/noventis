@@ -922,7 +922,7 @@ class NoventisManualML:
         
         logging.info(f"Data split complete: Train={len(X_train)}, Test={len(X_test)}")
         
-        # ========== INTERNAL PREPROCESSING ==========
+
         logging.info("Applying internal preprocessing (imputation + encoding)...")
         
         numeric_features = X_train.select_dtypes(include=np.number).columns.tolist()
@@ -964,8 +964,7 @@ class NoventisManualML:
         self.X_test = X_test_transformed
         self.y_train = y_train
         self.y_test = y_test
-        
-        # ========== MODEL TRAINING ==========
+
         logging.info("Starting model training phase...")
         
         model_list = (
@@ -1004,7 +1003,6 @@ class NoventisManualML:
                     'error': str(e)
                 })
         
-        # ========== RESULT VALIDATION ==========
         successful_results = [
             res for res in self.all_results 
             if 'error' not in res and res.get('metrics')
@@ -1020,7 +1018,6 @@ class NoventisManualML:
                 "\n".join(error_details)
             )
         
-        # ========== BEST MODEL SELECTION ==========
         primary_metric = (
             self.DEFAULT_CLASSIFICATION_METRIC 
             if self.task_type == 'classification' 
@@ -1035,12 +1032,10 @@ class NoventisManualML:
         best_score = self.best_model_info['metrics'][primary_metric]
         best_name = self.best_model_info['model_name']
         
-        logging.info("=" * 60)
         logging.info("TRAINING COMPLETE!")
         logging.info(f"Best Model: {best_name.upper()}")
         logging.info(f"Best {primary_metric}: {best_score:.4f}")
         logging.info(f"Successfully trained: {len(successful_results)}/{len(model_list)} models")
-        logging.info("=" * 60)
         
         if compare:
             self._print_comparison()
@@ -1856,13 +1851,12 @@ class NoventisManualML:
         training_time = self.best_model_info.get('training_time_seconds', 0)
         best_params_str = str(self.best_model_info.get('best_params', 'Default'))
         
-        # # Generate metrics HTML
-        # color_map = {
-        #     'mae': '#FFB86C',
-        #     'mse': '#FF79C6',
-        #     'rmse': '#8BE9FD',
-        #     'r2': '#50FA7B'
-        # }
+        color_map = {
+            'mae': '#FFB86C',
+            'mse': '#FF79C6',
+            'rmse': '#8BE9FD',
+            'r2': '#50FA7B'
+        }
         all_metrics_html = ""
 
         for metric_name, metric_value in self.best_model_info['metrics'].items():

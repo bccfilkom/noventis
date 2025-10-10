@@ -5,15 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "noventis"
 version = "0.1.0"
-description = "A comprehensive AutoML library for automated machine learning workflows"
+description = "An all-in-one automation library that simplifies data cleaning, exploratory data analysis, and machine learning — from raw data to ready-to-deploy models."
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Ahmad Nafim", email = "your-email@example.com"}
-]
-maintainers = [
-    {name = "Ahmad Nafim", email = "your-email@example.com"}
+  { name: "Noventis BCC FILKOM", email: "noventis.bccfilkom@gmail.com"}
+  { name: "Richard", email: "richardcen05@gmail.com" },
+  { name: "Fatoni Murfid syaafii", email: "fatonimurfids@gmail.com" },
+  { name: "Ahmad Nafi Mubarok.", email: "ahmadnafim30@gmail.com" },
+  { name: "Orie Abyan Maulana", email: "orieabyanm@gmail.com" },
+  { name: "Grace Wahyuni", email: "gracewahyuni06@student.ub.ac.id" },
+  { name: "Rimba Nevada", email: "nevadakenzie@gmail.com" },
+  { name: "Alexander Angelo", email: "alexanderangelo700@gmail.com" },
+  { name: "Jason Surya Wijaya", email: "jasonsurya17@gmail.com },
+  { name: "Nada Musyaffa Bilhaqi", email: "nadabilhaqi18@gmail.com" }
 ]
 keywords = [
     "machine learning",
@@ -34,6 +40,7 @@ keywords = [
     "shap",
     "flaml"
 ]
+
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -90,34 +97,12 @@ dependencies = [
 ]
 
 
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=3.0.0",
-    "black>=22.0.0",
-    "flake8>=4.0.0",
-    "mypy>=0.950",
-    "jupyter>=1.0.0",
-    "notebook>=6.4.0",
-]
-docs = [
-    "sphinx>=4.5.0",
-    "sphinx-rtd-theme>=1.0.0",
-]
-imbalanced = [
-    "imbalanced-learn>=0.9.0",
-]
-all = [
-    "noventis[dev,docs,imbalanced]",
-]
-
 [project.urls]
-Homepage = "https://github.com/yourusername/noventis"
+Homepage = "https://github.com/bccfilkom/noventis"
 Documentation = "https://noventis.readthedocs.io"
-Repository = "https://github.com/yourusername/noventis"
-"Bug Tracker" = "https://github.com/yourusername/noventis/issues"
-Changelog = "https://github.com/yourusername/noventis/blob/main/CHANGELOG.md"
+Repository = "https://github.com/bccfilkom/noventis"
+"Bug Tracker" = "https://github.com/bccfilkom/noventis/issues"
+Changelog = "https://github.com/bccfilkom/noventis/blob/main/CONTRIBUTING.md"
 
 [tool.setuptools]
 packages = ["noventis", "noventis.core", "noventis.data_cleaner", "noventis.eda_auto", "noventis.predictor"]
@@ -138,13 +123,6 @@ exclude = '''
   | dataset_for_examples
 )/
 '''
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = "--cov=noventis --cov-report=html --cov-report=term-missing"
 
 [tool.mypy]
 python_version = "3.8"
