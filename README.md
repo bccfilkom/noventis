@@ -11,7 +11,7 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[Website](https://noventis.dev) • [Documentation](https://docs.noventis.dev)
+[Website](https://noventis-fe.vercel.app/) • [Github](https://github.com/bccfilkom/noventis) • [Gmail](https://mail.google.com/mail/?view=cm&fs=1&to=noventis.bccfilkom@gmail.com&su=Hello%20Noventis%20Team&body=Hello,%20I%20would%20like%20to%20ask%20about%20the%20Noventis%20project.)
 
 <img width="1247" height="637" alt="Screenshot From 2025-10-02 09-44-31" src="https://github.com/user-attachments/assets/264f13ce-4f5a-477a-a89d-73f0c9a585bd" />
 
@@ -45,7 +45,7 @@ pip install noventis
 ### Install from Source
 
 ```bash
-git clone https://github.com/yourusername/noventis.git
+git clone https://github.com/bccfilkom/noventis.git
 cd noventis
 pip install -e .
 ```
@@ -173,7 +173,7 @@ Intelligent data preprocessing and cleaning with advanced strategies:
 - **Data Type Detection** - Intelligent type inference and conversion
 - **Duplicate Removal** - Smart duplicate detection and handling
 
-[Learn more →](docs/data_cleaner.md)
+[Learn more →](https://github.com/bccfilkom/noventis/blob/main/docs/data_cleaner.md)
 
 ### 🔍 EDA Auto
 
@@ -186,7 +186,7 @@ Comprehensive exploratory data analysis automation:
 - **Outlier Detection** - Automatic identification of anomalies
 - **Feature Relationships** - Scatter plots and pairwise analysis
 
-[Learn more →](docs/eda_auto.md)
+[Learn more →](https://github.com/bccfilkom/noventis/blob/main/docs/eda_auto.md)
 
 ### 🎯 Predictor
 
@@ -207,7 +207,7 @@ Automated machine learning with intelligent model selection:
 - CatBoost: Categorical Boosting
 - And many more...
 
-[Learn more →](docs/auto.md)
+[Learn more →](https://github.com/bccfilkom/noventis/blob/main/docs/auto.md)
 
 ---
 
@@ -229,7 +229,7 @@ Noventis automatically installs these dependencies:
 - **AutoML**: optuna, flaml, shap
 - **Feature Engineering**: category_encoders, statsmodels
 
-See [requirements.txt](requirements.txt) for complete list.
+See [requirements.txt](https://github.com/bccfilkom/noventis/blob/main/requirements.txt) for complete list.
 
 ---
 
@@ -239,7 +239,7 @@ We welcome contributions from the community! Here's how you can help:
 
 ### Ways to Contribute
 
-1. **🐛 Report Bugs** - Found a bug? [Open an issue](https://github.com/yourusername/noventis/issues)
+1. **🐛 Report Bugs** - Found a bug? [Open an issue](https://github.com/bccfilkom/noventis/issues)
 2. **💡 Suggest Features** - Have ideas? We'd love to hear them!
 3. **📖 Improve Documentation** - Help us make the docs better
 4. **🔧 Submit Pull Requests** - Fix bugs or add features
@@ -248,7 +248,7 @@ We welcome contributions from the community! Here's how you can help:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/noventis.git
+git clone https://github.com/bccfilkom/noventis.git
 cd noventis
 
 # Create virtual environment
@@ -266,7 +266,7 @@ flake8 noventis/
 black noventis/
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+See [CONTRIBUTING.md](https://github.com/bccfilkom/noventis/blob/main/CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
@@ -385,14 +385,14 @@ noventis.print_info()  # Check all dependencies
 
 ### Getting Help
 
-- 📖 [Documentation](https://docs.noventis.dev)
-- 🐛 [GitHub Issues](https://github.com/bcc/noventis/issues)
+- 📖 [Documentation](https://github.com/bccfilkom/noventis/tree/main/docs)
+- 🐛 [GitHub Issues](https://github.com/bccfilkom/noventis/issues)
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/bccfilkom/noventis/blob/main/LICENSE) file for details.
 
 ### Third-Party Licenses
 
@@ -425,12 +425,12 @@ If you use Noventis in your research, please cite:
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=bccfilkom/noventis&type=Date)](https://star-history.com/#yourusername/noventis&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=bccfilkom/noventis&type=Date)](https://star-history.com/#bccfilkom/noventis&Date)
 
 ---
 
 <div align="center">
 
-Made with ❤️ by [Noventis Team](https://noventis.dev)
+Made with ❤️ by [Noventis Team](https://mail.google.com/mail/?view=cm&fs=1&to=noventis.bccfilkom@gmail.com&su=Hello%20Noventis%20Team&body=Hello,%20I%20would%20like%20to%20ask%20about%20the%20Noventis%20project.)
 
-If you find Noventis useful, please consider giving it a ⭐ on [GitHub](https://github.com/yourusername/noventis)!
+If you find Noventis useful, please consider giving it a ⭐ on [GitHub](https://github.com/bccfilkom/noventis)!

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noventis"
-version = "0.1.1"
+version = "0.1.2"
 description = "An all-in-one automation library that simplifies data cleaning, exploratory data analysis, and machine learning — from raw data to ready-to-deploy models."
 readme = "README.md"
 requires-python = ">=3.8"
