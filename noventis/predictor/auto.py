@@ -2703,10 +2703,10 @@ def load_and_predict(
 
 
 # Module-level constants
-__version__ = "2.0.0"
-__author__ = "Noventis Team"
-__all__ = [
-    'NoventisAutoML',
-    'compare_multiple_datasets',
-    'load_and_predict'
-]
+# __version__ = "2.0.0"
+# __author__ = "Noventis Team"
+# __all__ = [
+#     'NoventisAutoML',
+#     'compare_multiple_datasets',
+#     'load_and_predict'
+# ]

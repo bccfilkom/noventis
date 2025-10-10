@@ -5,19 +5,15 @@
   Noventis
 </h1>
 
-
 ### Intelligent Automation for Your Data Analysis
 
 [![PyPI version](https://badge.fury.io/py/noventis.svg)](https://badge.fury.io/py/noventis)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[Website](https://noventis.dev) • [Documentation](https://docs.noventis.dev) 
-
+[Website](https://noventis.dev) • [Documentation](https://docs.noventis.dev)
 
 <img width="1247" height="637" alt="Screenshot From 2025-10-02 09-44-31" src="https://github.com/user-attachments/assets/264f13ce-4f5a-477a-a89d-73f0c9a585bd" />
-
-
 
 </div>
 
@@ -67,6 +63,7 @@ noventis.print_info()  # Show detailed installation info
 ## 🎯 Quick Start
 
 ### 1️⃣ Data Cleaner
+
 Get started with intelligent data preprocessing and cleaning.
 
 ```python
@@ -84,9 +81,10 @@ df_clean = cleaner.fit_transform(df)
 print(df_clean.info())
 ```
 
-👉 [Read the Data Cleaner Guide](docs/data_cleaner.md)
+👉 [Read the Data Cleaner Guide](https://github.com/bccfilkom/noventis/blob/main/docs/data_cleaner.md)
 
 ### 2️⃣ EDA Auto
+
 Automatically generate comprehensive exploratory data analysis reports.
 
 ```python
@@ -104,9 +102,10 @@ eda.show_correlations()
 eda.show_missing_patterns()
 ```
 
-👉 [Read the EDA Auto Guide](docs/eda_auto.md)
+👉 [Read the EDA Auto Guide](https://github.com/bccfilkom/noventis/blob/main/docs/eda_auto.md)
 
 ### 3️⃣ Predictor
+
 Build and train machine learning models with automated optimization.
 
 ```python
@@ -127,7 +126,7 @@ predictions = predictor.predict(X_test)
 print(predictor.get_metrics())
 ```
 
-👉 [Read the Predictor Guide](docs/predictor.md)
+[Read the Predictor Guide →](https://github.com/bccfilkom/noventis/blob/main/docs/predictor.md)
 
 ### 4️⃣ Complete Pipeline Example
 
@@ -201,6 +200,7 @@ Automated machine learning with intelligent model selection:
 - **Ensemble Methods** - Combines multiple models for better performance
 
 **Supported Algorithms:**
+
 - Scikit-learn: Random Forest, Gradient Boosting, Logistic Regression, SVM
 - XGBoost: Extreme Gradient Boosting
 - LightGBM: Light Gradient Boosting Machine
@@ -214,11 +214,13 @@ Automated machine learning with intelligent model selection:
 ## 🛠️ Requirements
 
 ### System Requirements
+
 - Python 3.8 or higher
 - 4GB RAM minimum (8GB+ recommended for large datasets)
 - Windows, macOS, or Linux
 
 ### Core Dependencies
+
 Noventis automatically installs these dependencies:
 
 - **Data Processing**: pandas, numpy, scipy
@@ -272,22 +274,22 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 This project exists thanks to all the people who contribute:
 
-| Contributor            | Role              |
-| ---------------------- | ----------------- |
-| **Richard**            | Product Manager   |
-| **Fatoni Murfids**     | AI Product Manager   |
-| **Ahmad Nafi Mubarok**      | Lead Data Scientist    |
-| **Orie Abyan Maulana** | Lead Data Analyst      |
-| **Grace Wahyuni**      | Data Analyst      |
-| **Alexander Angelo**   | Data Scientist    |
-| **Rimba Nevada**       | Data Scientist    |
-| **Jason Surya Winata** | Frontend Engineer |
-| **Nada Musyaffa Bilhaqi**              | Product Designer  |
-
+| Contributor               | Role                |
+| ------------------------- | ------------------- |
+| **Richard**               | Product Manager     |
+| **Fatoni Murfids**        | AI Product Manager  |
+| **Ahmad Nafi Mubarok**    | Lead Data Scientist |
+| **Orie Abyan Maulana**    | Lead Data Analyst   |
+| **Grace Wahyuni**         | Data Analyst        |
+| **Alexander Angelo**      | Data Scientist      |
+| **Rimba Nevada**          | Data Scientist      |
+| **Jason Surya Winata**    | Frontend Engineer   |
+| **Nada Musyaffa Bilhaqi** | Product Designer    |
 
 ### Special Thanks
 
 A huge thank you to the maintainers of our dependencies:
+
 - pandas, numpy, scikit-learn, and the entire Python scientific computing community
 - XGBoost, LightGBM, and CatBoost teams for excellent gradient boosting libraries
 - Optuna and FLAML teams for amazing AutoML frameworks
@@ -341,6 +343,7 @@ The folder structure of **Noventis** project:
 ```
 
 ### 📌 Notes
+
 - The `noventis/` folder contains the **main library code**
 - The `tests/` folder is dedicated to **unit testing and integration testing**
 - `setup.py` and `pyproject.toml` are used for **packaging and distribution**
@@ -355,6 +358,7 @@ The folder structure of **Noventis** project:
 ### Common Issues
 
 **Problem**: `ModuleNotFoundError: No module named 'noventis'`
+
 ```bash
 # Solution: Reinstall the package
 pip uninstall noventis
@@ -362,6 +366,7 @@ pip install noventis
 ```
 
 **Problem**: Dependencies conflict
+
 ```bash
 # Solution: Create a fresh virtual environment
 python -m venv fresh_env
@@ -370,6 +375,7 @@ pip install noventis
 ```
 
 **Problem**: Import errors after installation
+
 ```python
 # Solution: Verify installation
 import noventis
@@ -422,7 +428,6 @@ If you use Noventis in your research, please cite:
 [![Star History Chart](https://api.star-history.com/svg?repos=bccfilkom/noventis&type=Date)](https://star-history.com/#yourusername/noventis&Date)
 
 ---
-
 
 <div align="center">
 

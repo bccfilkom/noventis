@@ -1,11 +1,16 @@
+LICENSE
+MANIFEST.in
 README.md
 pyproject.toml
-setup.py
+requirements.txt
+setup.cfg
 noventis/__init__.py
 noventis.egg-info/PKG-INFO
 noventis.egg-info/SOURCES.txt
 noventis.egg-info/dependency_links.txt
+noventis.egg-info/requires.txt
 noventis.egg-info/top_level.txt
+noventis/asset/Logo.png
 noventis/data_cleaner/__init__.py
 noventis/data_cleaner/auto.py
 noventis/data_cleaner/data_quality.py
@@ -13,6 +18,8 @@ noventis/data_cleaner/encoding.py
 noventis/data_cleaner/imputing.py
 noventis/data_cleaner/outlier_handling.py
 noventis/data_cleaner/scaling.py
+noventis/eda_auto/__init__.py
+noventis/eda_auto/eda_auto.py
 noventis/predictor/__init__.py
 noventis/predictor/auto.py
 noventis/predictor/manual.py

@@ -4,22 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noventis"
-version = "0.1.0"
+version = "0.1.1"
 description = "An all-in-one automation library that simplifies data cleaning, exploratory data analysis, and machine learning — from raw data to ready-to-deploy models."
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-  { name: "Noventis BCC FILKOM", email: "noventis.bccfilkom@gmail.com"},
-  { name: "Richard", email: "richardcen05@gmail.com" },
-  { name: "Fatoni Murfid syaafii", email: "fatonimurfids@gmail.com" },
-  { name: "Ahmad Nafi Mubarok", email: "ahmadnafim30@gmail.com" },
-  { name: "Orie Abyan Maulana", email: "orieabyanm@gmail.com" },
-  { name: "Grace Wahyuni", email: "gracewahyuni06@student.ub.ac.id" },
-  { name: "Rimba Nevada", email: "nevadakenzie@gmail.com" },
-  { name: "Alexander Angelo", email: "alexanderangelo700@gmail.com" },
-  { name: "Jason Surya Wijaya", email: "jasonsurya17@gmail.com },
-  { name: "Nada Musyaffa Bilhaqi", email: "nadabilhaqi18@gmail.com" }
+  { name = "Noventis BCC FILKOM", email = "noventis.bccfilkom@gmail.com"},
+  { name = "Richard", email = "richardcen05@gmail.com" },
+  { name = "Fatoni Murfid syaafii", email = "fatonimurfids@gmail.com" },
+  { name = "Ahmad Nafi Mubarok", email = "ahmadnafim30@gmail.com" },
+  { name = "Orie Abyan Maulana", email = "orieabyanm@gmail.com" },
+  { name = "Grace Wahyuni", email = "gracewahyuni06@student.ub.ac.id" },
+  { name = "Rimba Nevada", email = "nevadakenzie@gmail.com" },
+  { name = "Alexander Angelo", email = "alexanderangelo700@gmail.com" },
+  { name = "Jason Surya Wijaya", email = "jasonsurya17@gmail.com" },
+  { name = "Nada Musyaffa Bilhaqi", email = "nadabilhaqi18@gmail.com" }
 ]
 keywords = [
     "machine learning",
@@ -105,7 +105,7 @@ Repository = "https://github.com/bccfilkom/noventis"
 Changelog = "https://github.com/bccfilkom/noventis/blob/main/CONTRIBUTING.md"
 
 [tool.setuptools]
-packages = ["noventis", "noventis.core", "noventis.data_cleaner", "noventis.eda_auto", "noventis.predictor"]
+packages = ["noventis", "noventis.data_cleaner", "noventis.eda_auto", "noventis.predictor"]
 
 [tool.setuptools.package-data]
 noventis = ["asset/*", "py.typed"]
