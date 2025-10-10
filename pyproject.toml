@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-  { name: "Noventis BCC FILKOM", email: "noventis.bccfilkom@gmail.com"}
+  { name: "Noventis BCC FILKOM", email: "noventis.bccfilkom@gmail.com"},
   { name: "Richard", email: "richardcen05@gmail.com" },
   { name: "Fatoni Murfid syaafii", email: "fatonimurfids@gmail.com" },
   { name: "Ahmad Nafi Mubarok.", email: "ahmadnafim30@gmail.com" },
