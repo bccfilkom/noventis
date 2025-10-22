@@ -1115,7 +1115,6 @@ class NoventisManualML:
         
         df = pd.DataFrame(records).set_index('model')
         
-        # Sort by primary metric
         primary_metric = (
             self.DEFAULT_CLASSIFICATION_METRIC 
             if self.task_type == 'classification' 
@@ -1922,7 +1921,9 @@ class NoventisManualML:
                 <p><strong>Number of Features:</strong> {self.X_train.shape[1]}</p>
                 <p><strong>Test Split Size:</strong> {(self.X_test.shape[0] / (self.X_train.shape[0] + self.X_test.shape[0]) * 100):.1f}%</p>
                 <p style="margin-top: 15px;"><strong>Target Distribution (Train):</strong></p>
-                <pre class="params-box">{str(self.y_train.value_counts().to_dict())}</pre>
+                <div class="scrollable-box">
+                    <pre>{str(self.y_train.value_counts().to_dict())}</pre>
+                </div>
             </div>
             <div class="grid-item">
                 <h4>Data Processing Pipeline</h4>
@@ -2302,7 +2303,54 @@ class NoventisManualML:
                     color: #FFB86C;
                     text-shadow: 0 0 10px rgba(255, 184, 108, 0.5);
                 }}
+                [data-report-id="{report_id}"] .params-box {{
+                    background-color: var(--bg-dark-1);
+                    border: 1px solid var(--border-color);
+                    border-radius: 6px;
+                    padding: 12px;
+                    color: var(--text-light);
+                    font-size: 0.9em;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    max-width: 100%;
+                    overflow-x: auto;
+                }}
+                [data-report-id="{report_id}"] .scrollable-box {{
+                    max-height: 150px;
+                    overflow-y: auto;
+                    background-color: var(--bg-dark-1);
+                    border: 1px solid var(--border-color);
+                    border-radius: 6px;
+                    padding: 12px;
+                    margin-top: 5px;
+                }}
 
+                [data-report-id="{report_id}"] .scrollable-box pre {{
+                    margin: 0;
+                    color: var(--text-light);
+                    font-size: 0.9em;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                }}
+
+                [data-report-id="{report_id}"] .scrollable-box::-webkit-scrollbar {{
+                    width: 8px;
+                }}
+
+                [data-report-id="{report_id}"] .scrollable-box::-webkit-scrollbar-track {{
+                    background: var(--bg-dark-2);
+                    border-radius: 4px;
+                }}
+
+                [data-report-id="{report_id}"] .scrollable-box::-webkit-scrollbar-thumb {{
+                    background: var(--primary-blue);
+                    border-radius: 4px;
+                }}
+
+                [data-report-id="{report_id}"] .scrollable-box::-webkit-scrollbar-thumb:hover {{
+                    background: var(--primary-orange);
+                }}
             </style>
         </head>
         <body>
