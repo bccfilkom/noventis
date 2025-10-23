@@ -1,10 +1,10 @@
 Metadata-Version: 2.4
 Name: noventis
-Version: 0.1.2
+Version: 0.1.3
 Summary: An all-in-one automation library that simplifies data cleaning, exploratory data analysis, and machine learning — from raw data to ready-to-deploy models.
 Home-page: https://github.com/bccfilkom/noventis
 Author: Richard, Fatoni Murfid Syafii, Ahmad Nafi Mubarok, Orie Abyan Maulana, Grace Wahyuni, Rimba Nevada, Alexander Angelo, Jason Surya Winata, Nada Musyaffa Bilhaqi
-Author-email: Noventis BCC FILKOM <noventis.bccfilkom@gmail.com>, Richard <richardcen05@gmail.com>, Fatoni Murfid syaafii <fatonimurfids@gmail.com>, Ahmad Nafi Mubarok <ahmadnafim30@gmail.com>, Orie Abyan Maulana <orieabyanm@gmail.com>, Grace Wahyuni <gracewahyuni06@student.ub.ac.id>, Rimba Nevada <nevadakenzie@gmail.com>, Alexander Angelo <alexanderangelo700@gmail.com>, Jason Surya Wijaya <jasonsurya17@gmail.com>, Nada Musyaffa Bilhaqi <nadabilhaqi18@gmail.com>
+Author-email: Noventis BCC FILKOM <noventis.bccfilkom@gmail.com>, Richard <richardcen05@gmail.com>, Fatoni Murfid Syaafii <fatonimurfids@gmail.com>, Ahmad Nafi Mubarok <ahmadnafim30@gmail.com>, Orie Abyan Maulana <orieabyanm@gmail.com>, Grace Wahyuni <gracewahyuni06@student.ub.ac.id>, Rimba Nevada <nevadakenzie@gmail.com>, Alexander Angelo <alexanderangelo700@gmail.com>, Jason Surya Wijaya <jasonsurya17@gmail.com>, Nada Musyaffa Bilhaqi <nadabilhaqi18@gmail.com>
 License: MIT
 Project-URL: Homepage, https://github.com/bccfilkom/noventis
 Project-URL: Documentation, https://noventis.readthedocs.io
@@ -12,7 +12,7 @@ Project-URL: Repository, https://github.com/bccfilkom/noventis
 Project-URL: Bug Tracker, https://github.com/bccfilkom/noventis/issues
 Project-URL: Changelog, https://github.com/bccfilkom/noventis/blob/main/CONTRIBUTING.md
 Keywords: machine learning,automl,automated machine learning,data science,artificial intelligence,data cleaning,feature engineering,eda,exploratory data analysis,predictor,scikit-learn,xgboost,lightgbm,catboost,optuna,shap,flaml
-Classifier: Development Status :: 3 - Alpha
+Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
 Classifier: Intended Audience :: Science/Research
 Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
@@ -25,28 +25,28 @@ Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
 Classifier: Operating System :: OS Independent
-Requires-Python: >=3.8
+Requires-Python: <3.13,>=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: pandas<2.0.0,>=1.3.0
-Requires-Dist: numpy<1.24.0,>=1.21.0
-Requires-Dist: scipy<1.11.0,>=1.7.0
-Requires-Dist: matplotlib<3.8.0,>=3.4.0
-Requires-Dist: seaborn<0.13.0,>=0.11.0
-Requires-Dist: ipython<8.13.0,>=7.30.0
-Requires-Dist: scikit-learn<1.4.0,>=1.0.0
-Requires-Dist: statsmodels<0.15.0,>=0.13.0
-Requires-Dist: optuna<3.4.0,>=3.0.0
-Requires-Dist: shap<0.45.0,>=0.41.0
-Requires-Dist: flaml<2.2.0,>=2.0.0
-Requires-Dist: xgboost<1.8.0,>=1.5.0
-Requires-Dist: lightgbm<4.2.0,>=3.3.0
-Requires-Dist: catboost<1.3.0,>=1.0.0
-Requires-Dist: category_encoders<2.7.0,>=2.5.0
-Requires-Dist: joblib<1.4.0,>=1.1.0
-Requires-Dist: imbalanced-learn<0.11.0,>=0.9.0
-Requires-Dist: Jinja2<4.0.0,>=3.0.0
-Requires-Dist: nbformat<6.0.0,>=5.5.0
+Requires-Dist: pandas>=1.3.0
+Requires-Dist: numpy>=1.21.0
+Requires-Dist: scipy>=1.7.0
+Requires-Dist: matplotlib>=3.4.0
+Requires-Dist: seaborn>=0.11.0
+Requires-Dist: ipython>=7.30.0
+Requires-Dist: scikit-learn>=1.0.0
+Requires-Dist: statsmodels>=0.13.0
+Requires-Dist: optuna>=3.0.0
+Requires-Dist: shap>=0.41.0
+Requires-Dist: flaml>=2.0.0
+Requires-Dist: xgboost>=1.5.0
+Requires-Dist: lightgbm>=3.3.0
+Requires-Dist: catboost>=1.0.0
+Requires-Dist: category_encoders>=2.5.0
+Requires-Dist: joblib>=1.1.0
+Requires-Dist: imbalanced-learn>=0.9.0
+Requires-Dist: Jinja2>=3.0.0
+Requires-Dist: nbformat>=5.5.0
 Dynamic: license-file
 
 <div align="center">
