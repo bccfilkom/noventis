@@ -1227,7 +1227,8 @@ def data_cleaner(
     encoding: str = 'auto',
     scaling: str = 'auto',
     verbose: bool = True,
-    return_instance: bool = False  
+    return_instance: bool = False,
+    keep_target: bool = False
 ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, 'NoventisDataCleaner']]:
     """
     A high-level wrapper function to run the Noventis data cleaning pipeline.
@@ -1299,6 +1300,9 @@ def data_cleaner(
         >>> # Access quality metrics
         >>> print(cleaner.quality_score_)
     """
+    if NoventisDataCleaner is None:
+            raise RuntimeError("NoventisDataCleaner class could not be imported. Cleaning pipeline cannot run.")
+
     # Load Data
     try:
         if isinstance(data, str):
@@ -1310,40 +1314,67 @@ def data_cleaner(
     except FileNotFoundError:
         print(f"ERROR: File not found at path: {data}")
         return None if not return_instance else (None, None)
+    except Exception as e:
+        print(f"ERROR: Failed to load data. {e}")
+        return None if not return_instance else (None, None)
 
-    # Separate Features and Target
-    if target_column and target_column in df.columns:
-        X = df.drop(columns=[target_column])
-        y = df[target_column]
-        if verbose:
-            print(f"Target column '{target_column}' identified.")
+
+    original_index = df.index 
+    y = None 
+    if target_column:
+        if target_column in df.columns:
+            X = df.drop(columns=[target_column])
+            y = df[target_column]
+            if verbose:
+                print(f"Target column '{target_column}' identified and separated.")
+        else:
+            X = df
+            if verbose:
+                print(f"WARNING: Target column '{target_column}' not found. Proceeding without a target.")
     else:
         X = df
-        y = None
-        if target_column and verbose:
-            print(f"WARNING: Target column '{target_column}' not found. Proceeding without a target.")
 
-    # Map Function Arguments to Class Parameters
     imputer_method = None if null_handling == 'auto' else null_handling
-    outlier_method = 'iqr_trim' if outlier_handling == 'dropping' else outlier_handling
+    outlier_method_map = {'dropping': 'iqr_trim'}
+    outlier_method = outlier_method_map.get(outlier_handling, outlier_handling) 
 
     imputer_params = {'method': imputer_method}
     outlier_params = {'default_method': outlier_method}
-    encoder_params = {'method': encoding, 'target_column': target_column}
+    encoder_params = {'method': encoding, 'target_column': target_column if encoding == 'target' or encoding == 'auto' else None}
     scaler_params = {'method': scaling}
 
-    # Initialize and Run the Main Cleaner
-    cleaner_instance = NoventisDataCleaner(
-        imputer_params=imputer_params,
-        outlier_params=outlier_params,
-        encoder_params=encoder_params,
-        scaler_params=scaler_params,
-        verbose=verbose
-    )
+    try:
+        cleaner_instance = NoventisDataCleaner(
+            imputer_params=imputer_params,
+            outlier_params=outlier_params,
+            encoder_params=encoder_params,
+            scaler_params=scaler_params,
+            verbose=verbose
+        )
 
-    cleaned_df = cleaner_instance.fit_transform(X, y)
+        cleaned_X = cleaner_instance.fit_transform(X, y)
+
+        final_df = cleaned_X 
+        if keep_target and y is not None:
+            y_aligned = y.loc[cleaned_X.index] if cleaned_X.index.equals(original_index) else y.reindex(cleaned_X.index)
+
+            final_df = cleaned_X.join(y_aligned)
+            if verbose:
+                if target_column in final_df.columns:
+                    print(f"Target column '{target_column}' has been re-attached to the cleaned DataFrame.")
+                else:
+                    print(f"Failed to re-attach target column '{target_column}'. It might have been dropped or index mismatch.")
+        elif keep_target and y is None:
+            if verbose:
+                print("keep_target=True was specified, but no target column was found or provided.")
+
+    except Exception as e:
+        print(f"ERROR: An error occurred during the cleaning pipeline: {e}")
+        empty_df = pd.DataFrame()
+        return (empty_df, None) if return_instance else empty_df
+
 
     if return_instance:
-        return cleaned_df, cleaner_instance
+        return final_df, cleaner_instance
     else:
-        return cleaned_df
+        return final_df

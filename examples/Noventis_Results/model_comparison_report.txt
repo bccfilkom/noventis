@@ -2,65 +2,73 @@
          NOVENTIS AutoML - MODEL COMPARISON REPORT
 ================================================================================
 
-Task Type: Regression
-Primary Metric: r2_score
-Best Model: Catboost
+Task Type: Classification
+Primary Metric: f1_score
+Best Model: Automl
 
 MODEL RANKINGS:
 ------------------------------------------------------------
 
-1. Catboost
-   Primary Score (r2_score): 0.8492
+1. Automl
+   Primary Score (f1_score): 1.0000
    All Metrics:
-     • Mae: 0.2931
-     • Mse: 0.1976
-     • Rmse: 0.4445
-     • R2 Score: 0.8492
+     • Accuracy: 1.0000
+     • Precision: 1.0000
+     • Recall: 1.0000
+     • F1 Score: 1.0000
 
-2. Lightgbm
-   Primary Score (r2_score): 0.8360
+2. Decision Tree
+   Primary Score (f1_score): 1.0000
    All Metrics:
-     • Mae: 0.3078
-     • Mse: 0.2148
-     • Rmse: 0.4635
-     • R2 Score: 0.8360
+     • Accuracy: 1.0000
+     • Precision: 1.0000
+     • Recall: 1.0000
+     • F1 Score: 1.0000
 
-3. Automl
-   Primary Score (r2_score): 0.8320
+3. Catboost
+   Primary Score (f1_score): 1.0000
    All Metrics:
-     • Mae: 0.3135
-     • Mse: 0.2202
-     • Rmse: 0.4693
-     • R2 Score: 0.8320
+     • Accuracy: 1.0000
+     • Precision: 1.0000
+     • Recall: 1.0000
+     • F1 Score: 1.0000
 
-4. Xgboost
-   Primary Score (r2_score): 0.8301
+4. Gradient Boosting
+   Primary Score (f1_score): 1.0000
    All Metrics:
-     • Mae: 0.3096
-     • Mse: 0.2226
-     • Rmse: 0.4718
-     • R2 Score: 0.8301
+     • Accuracy: 1.0000
+     • Precision: 1.0000
+     • Recall: 1.0000
+     • F1 Score: 1.0000
 
-5. Random Forest
-   Primary Score (r2_score): 0.8051
+5. Logistic Regression
+   Primary Score (f1_score): 0.3333
    All Metrics:
-     • Mae: 0.3275
-     • Mse: 0.2554
-     • Rmse: 0.5053
-     • R2 Score: 0.8051
+     • Accuracy: 0.5000
+     • Precision: 0.2500
+     • Recall: 0.5000
+     • F1 Score: 0.3333
 
-6. Gradient Boosting
-   Primary Score (r2_score): 0.7756
+6. Random Forest
+   Primary Score (f1_score): 0.3333
    All Metrics:
-     • Mae: 0.3716
-     • Mse: 0.2940
-     • Rmse: 0.5422
-     • R2 Score: 0.7756
+     • Accuracy: 0.5000
+     • Precision: 0.2500
+     • Recall: 0.5000
+     • F1 Score: 0.3333
 
-7. Linear Regression
-   Primary Score (r2_score): 0.5758
+7. Xgboost
+   Primary Score (f1_score): 0.3333
    All Metrics:
-     • Mae: 0.5332
-     • Mse: 0.5559
-     • Rmse: 0.7456
-     • R2 Score: 0.5758
+     • Accuracy: 0.5000
+     • Precision: 0.2500
+     • Recall: 0.5000
+     • F1 Score: 0.3333
+
+8. Lightgbm
+   Primary Score (f1_score): 0.3333
+   All Metrics:
+     • Accuracy: 0.5000
+     • Precision: 0.2500
+     • Recall: 0.5000
+     • F1 Score: 0.3333
