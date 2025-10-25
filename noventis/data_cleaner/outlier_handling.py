@@ -223,56 +223,92 @@ class NoventisOutlierHandler:
         return summary_html
 
     def plot_comparison(self, max_cols: int = 1):
-        """Plot before/after comparison of outlier handling results."""
-        if not self.is_fitted_ or not self._plot_data_snapshot: 
-            return None
+            """Plot before/after comparison of outlier handling results."""
+            if not self.is_fitted_ or self._original_df_snapshot is None:
+                # Return None if the handler hasn't been fitted or no original data snapshot exists
+                return None
             
-        cols_to_plot = [col for col, method in self.methods_.items() if method != 'none']
-        if not cols_to_plot: 
-            return None
-            
-        col_to_plot = cols_to_plot[0]
+            # Select columns where outlier handling was actually applied (method is not 'none')
+            cols_to_plot = [col for col, method in self.methods_.items() if method != 'none']
+            if not cols_to_plot:
+                # Return None if no columns were actually processed for outliers
+                return None
+                
+            # Limit to the first relevant column based on max_cols=1 default or input
+            # Ensure max_cols doesn't exceed the number of plotted columns
+            num_cols_to_plot = min(max_cols, len(cols_to_plot))
+            selected_cols = cols_to_plot[:num_cols_to_plot]
 
-        original_series = self._plot_data_snapshot[col_to_plot]
-        
-        temp_df = pd.DataFrame({col_to_plot: original_series})
-        for col in self._plot_data_snapshot:
-            if col != col_to_plot:
-                temp_df[col] = self._plot_data_snapshot[col]
-        
-        transformed_df = self.transform(temp_df.copy(), apply_train_removals=True)
+            figs = [] # Store figures if max_cols > 1 in the future
 
-        color_before, color_after = '#58A6FF', '#F78166'
-        bg_color, text_color = '#0D1117', '#C9D1D9'
+            for col_to_plot in selected_cols:
+                original_data = self._original_df_snapshot
+                # Ensure transformed_data is generated within the loop if needed for multiple plots
+                # For max_cols=1, generating once is fine.
+                transformed_data = self.transform(original_data.copy()) # This might have fewer rows
 
-        fig = plt.figure(figsize=(16, 8), facecolor=bg_color)
-        gs = fig.add_gridspec(2, 2, height_ratios=(3, 1), hspace=0.05)
-        fig.suptitle(f"Outlier Handling Comparison for '{col_to_plot}' (Method: {self.methods_[col_to_plot].upper()})",
-                    fontsize=20, color=text_color, weight='bold')
+                # Check if the column still exists after potential drops (though less likely here)
+                if col_to_plot not in original_data.columns or col_to_plot not in transformed_data.columns:
+                    print(f"Warning: Column '{col_to_plot}' not found in original or transformed data for plotting. Skipping.")
+                    continue
 
-        ax_hist_before = fig.add_subplot(gs[0, 0])
-        ax_box_before = fig.add_subplot(gs[1, 0], sharex=ax_hist_before)
-        sns.histplot(data=original_series, kde=True, ax=ax_hist_before, color=color_before)
-        sns.boxplot(data=original_series, ax=ax_box_before, color=color_before)
-        ax_hist_before.set_title("Before", color=text_color, fontsize=14)
-        plt.setp(ax_hist_before.get_xticklabels(), visible=False)
+                color_before, color_after = '#58A6FF', '#F78166'
+                bg_color, text_color = '#0D1117', '#C9D1D9'
 
-        ax_hist_after = fig.add_subplot(gs[0, 1])
-        ax_box_after = fig.add_subplot(gs[1, 1], sharex=ax_hist_after)
-        sns.histplot(data=transformed_df[col_to_plot], kde=True, ax=ax_hist_after, color=color_after)
-        sns.boxplot(data=transformed_df[col_to_plot], ax=ax_box_after, color=color_after)
-        ax_hist_after.set_title("After", color=text_color, fontsize=14)
-        plt.setp(ax_hist_after.get_xticklabels(), visible=False)
+                fig = plt.figure(figsize=(16, 8), facecolor=bg_color)
+                gs = fig.add_gridspec(2, 2, height_ratios=(3, 1), hspace=0.05)
+                fig.suptitle(f"Outlier Handling Comparison for '{col_to_plot}' (Method: {self.methods_[col_to_plot].upper()})",
+                            fontsize=20, color=text_color, weight='bold')
 
-        for ax in [ax_hist_before, ax_box_before, ax_hist_after, ax_box_after]:
-            ax.set_facecolor(bg_color)
-            ax.tick_params(colors=text_color, which='both')
-            for spine in ax.spines.values(): 
-                spine.set_edgecolor(text_color)
-            ax.xaxis.label.set_color(text_color)
-            ax.yaxis.label.set_color(text_color)
-            ax.set_xlabel('')
-            ax.set_ylabel('')
+                # --- BEFORE ---
+                ax_hist_before = fig.add_subplot(gs[0, 0])
+                ax_box_before = fig.add_subplot(gs[1, 0], sharex=ax_hist_before)
+                
+                # Use DataFrame + x argument for robustness with seaborn
+                try:
+                    sns.histplot(data=original_data, x=col_to_plot, kde=True, ax=ax_hist_before, color=color_before)
+                    sns.boxplot(data=original_data, x=col_to_plot, ax=ax_box_before, color=color_before)
+                    ax_hist_before.set_title("Before", color=text_color, fontsize=14)
+                    plt.setp(ax_hist_before.get_xticklabels(), visible=False) # Hide x-axis labels on hist plot
+                except Exception as e:
+                    print(f"Warning: Could not plot 'Before' for {col_to_plot}. Error: {e}")
+                    ax_hist_before.text(0.5, 0.5, "Error plotting 'Before'", ha='center', va='center', color='red')
+                    ax_box_before.text(0.5, 0.5, "Error plotting 'Before'", ha='center', va='center', color='red')
 
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-        return fig
+
+                # --- AFTER ---
+                ax_hist_after = fig.add_subplot(gs[0, 1])
+                ax_box_after = fig.add_subplot(gs[1, 1], sharex=ax_hist_after) # ShareX with the AFTER histogram
+
+                # Pass the DataFrame and specify the column with 'x' to avoid index issues
+                try:
+                    # Check if transformed data for the column is empty (e.g., all rows dropped)
+                    if transformed_data[col_to_plot].empty:
+                        ax_hist_after.text(0.5, 0.5, "No data remaining after outlier removal", ha='center', va='center', color=text_color)
+                        ax_box_after.text(0.5, 0.5, "No data remaining", ha='center', va='center', color=text_color)
+                    else:
+                        sns.histplot(data=transformed_data, x=col_to_plot, kde=True, ax=ax_hist_after, color=color_after)
+                        sns.boxplot(data=transformed_data, x=col_to_plot, ax=ax_box_after, color=color_after)
+                    ax_hist_after.set_title("After", color=text_color, fontsize=14)
+                    plt.setp(ax_hist_after.get_xticklabels(), visible=False)
+                except Exception as e:
+                    print(f"Warning: Could not plot 'After' for {col_to_plot}. Error: {e}")
+                    ax_hist_after.text(0.5, 0.5, "Error plotting 'After'", ha='center', va='center', color='red')
+                    ax_box_after.text(0.5, 0.5, "Error plotting 'After'", ha='center', va='center', color='red')
+
+
+                # Style all axes
+                for ax in [ax_hist_before, ax_box_before, ax_hist_after, ax_box_after]:
+                    ax.set_facecolor(bg_color)
+                    ax.tick_params(colors=text_color, which='both')
+                    for spine in ax.spines.values(): spine.set_edgecolor(text_color)
+                    ax.xaxis.label.set_color(text_color)
+                    ax.yaxis.label.set_color(text_color)
+                    ax.set_xlabel('') # Remove individual x-labels
+                    ax.set_ylabel('') # Remove individual y-labels
+
+                plt.tight_layout(rect=[0, 0, 1, 0.95])
+                figs.append(fig) # Add figure to list
+
+            # Return the single figure if max_cols=1, otherwise could return list or handle differently
+            return figs[0] if len(figs) == 1 else figs # Return the first fig if only one was requested/generated

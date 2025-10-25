@@ -209,7 +209,10 @@ class NoventisAutoEDA:
         wedges, texts, autotexts = ax.pie(segment_impact, labels=segment_impact.index, autopct='%1.1f%%', startangle=90, colors=sns.color_palette("Blues_r", len(segment_impact)))
         plt.setp(autotexts, size=10, weight="bold", color="white"); ax.set_title(f"Impact by '{segment_col}'")
         plot_b64 = plot_to_base64(fig)
-        summary_html = "<h4>Revenue Impact:</h4>" + segment_impact.to_frame().map('{:,.0f}'.format).to_html(classes='styled-table-small')
+        summary_html = "<h4>Revenue Impact:</h4>" + segment_impact.to_frame().to_html(
+            classes='styled-table-small',
+            formatters={self.target: '{:,.0f}'.format} # Apply format only to the target column
+        )
         return f"<div class='biz-panel'><img src='{plot_b64}'>{summary_html}</div>"
 
     def _business_panel_priority_matrix(self) -> str:
@@ -795,125 +798,135 @@ class NoventisAutoEDA:
     def _academic_panel_model_diagnostics(self) -> str:
         """
         Generates academic panel for model diagnostics and validation.
-        
-        Returns:
-            str: HTML string containing three diagnostic sections:
-                1. Residual Analysis:
-                   - Residual vs Fitted scatter plot
-                   - Pattern detection (Random ✓ or Pattern Detected ⚠)
-                
-                2. Cross-Validation Score:
-                   - Circular gauge visualization
-                   - Color-coded performance (Excellent/Good/Poor)
-                   - Standard deviation of CV scores
-                
-                3. Feature Importance:
-                   - Top 3 most important features
-                   - Horizontal bar chart representation
-                   - Importance values
-                
-                Returns placeholder if target not available or model fails to fit.
+        Handles both regression (residual analysis) and classification (accuracy).
         """
         if not self.target:
             return "<div class='academic-panel-placeholder'><h4>Model Diagnostics</h4><p>Requires a target variable for model diagnostics.</p></div>"
-        
+
         model, data_tuple, cv_scores = self._fit_diagnostic_model()
-        
+
         if model is None:
             return "<div class='academic-panel-placeholder'><h4>Model Diagnostics</h4><p>Could not fit diagnostic model with available data.</p></div>"
-        
+
         X, y, y_pred = data_tuple
-        
-        # 1. Mini Residual Plot
-        residuals = y - y_pred
-        fig_res, ax_res = plt.subplots(figsize=(4, 3))
-        ax_res.scatter(y_pred, residuals, alpha=0.6, color='#58A6FF', s=20)
-        ax_res.axhline(y=0, color='#F78166', linestyle='--', alpha=0.8)
-        ax_res.set_xlabel('Fitted Values')
-        ax_res.set_ylabel('Residuals')
-        ax_res.set_title('Residuals vs Fitted')
-        
-        # Check for patterns (simplified)
-        residual_pattern = "Random ✓" if abs(stats.pearsonr(y_pred, residuals)[0]) < 0.3 else "Pattern Detected ⚠"
-        
-        residual_plot_b64 = plot_to_base64(fig_res)
-        
-        # 2. CV Score Gauge
+
+        is_classification_model = hasattr(model, 'predict_proba') 
+        is_target_numeric = pd.api.types.is_numeric_dtype(y)
+
+        diagnostic_plot_html = ""
+        diagnostic_label_html = ""
+
+        if is_target_numeric and not is_classification_model:
+            residuals = y - y_pred
+            fig_res, ax_res = plt.subplots(figsize=(4, 3))
+            ax_res.scatter(y_pred, residuals, alpha=0.6, color='#58A6FF', s=20)
+            ax_res.axhline(y=0, color='#F78166', linestyle='--', alpha=0.8)
+            ax_res.set_xlabel('Fitted Values')
+            ax_res.set_ylabel('Residuals')
+            ax_res.set_title('Residuals vs Fitted')
+
+            residual_pattern = "Pattern Check Skipped" 
+            try:
+                if (len(y_pred) == len(residuals) and
+                    pd.api.types.is_numeric_dtype(y_pred) and
+                    pd.api.types.is_numeric_dtype(residuals) and
+                    np.var(y_pred) > 1e-6 and np.var(residuals) > 1e-6): 
+                    corr_res_pred = stats.pearsonr(y_pred, residuals)[0]
+                    residual_pattern = "Random ✓" if abs(corr_res_pred) < 0.3 else "Pattern Detected ⚠"
+                else:
+                    residual_pattern = "Pattern Check Skipped (Data issue)"
+            except Exception as e:
+                 residual_pattern = f"Pattern Check Failed: {str(e)[:30]}" 
+
+            residual_plot_b64 = plot_to_base64(fig_res)
+            diagnostic_plot_html = f"<img src='{residual_plot_b64}' alt='Residual Plot'>"
+            diagnostic_label_html = f'<p class="pattern-check">{residual_pattern}</p>'
+
+        else: 
+            accuracy = accuracy_score(y, y_pred)
+            diagnostic_plot_html = f"""
+                <div class='classification-diag-score'>
+                    <div class='diag-metric-label'>Model Accuracy</div>
+                    <div class='diag-metric-value'>{accuracy:.2f}</div>
+                </div>
+            """
+            diagnostic_label_html = "<p class='pattern-check'>Accuracy Score</p>"
+
         cv_mean = cv_scores.mean()
         cv_std = cv_scores.std()
-        
-        # Convert to percentage for display (handle negative scores like neg_mean_squared_error)
-        if cv_mean < 0:  # neg_mean_squared_error case
-            display_score = max(0, 100 + cv_mean * 10)  # Simple conversion
-            score_type = "R² Score"
-        else:  # accuracy case
-            display_score = cv_mean * 100
-            score_type = "Accuracy"
-        
-        # Gauge visualization
+        display_score = 0
+        score_type = "CV Score (Error)"
+        gauge_label = "UNKNOWN"
+
+        try:
+            if cv_mean < 0: 
+                if pd.api.types.is_numeric_dtype(y):
+                    baseline_mse = mean_squared_error(y, [y.mean()] * len(y))
+                    r2_approx = 1 - (abs(cv_mean) / baseline_mse) if baseline_mse > 1e-9 else 0 
+                    display_score = max(0, min(100, r2_approx * 100)) 
+                    score_type = "CV R² Score (Approx)"
+                else:
+                    score_type = "CV Score (Neg Metric)" 
+            else: 
+                display_score = max(0, min(100, cv_mean * 100)) 
+                score_type = "CV Accuracy" 
+
+            if display_score >= 80: colors = ['#28A745', '#30363D']; gauge_label = "EXCELLENT" 
+            elif display_score >= 60: colors = ['#FFC107', '#30363D']; gauge_label = "GOOD"
+            else: colors = ['#DC3545', '#30363D']; gauge_label = "POOR"
+        except Exception:
+             colors = ['#6C757D', '#30363D']; gauge_label = "ERROR" 
+
         fig_gauge, ax_gauge = plt.subplots(figsize=(3, 3), subplot_kw={'aspect': 'equal'})
-        
-        # Simple gauge using pie chart
-        if display_score >= 80:
-            colors = ['#28A745', '#E6E6E6']
-            gauge_label = "EXCELLENT"
-        elif display_score >= 60:
-            colors = ['#FFC107', '#E6E6E6'] 
-            gauge_label = "GOOD"
-        else:
-            colors = ['#DC3545', '#E6E6E6']
-            gauge_label = "POOR"
-        
-        wedges, texts = ax_gauge.pie([display_score, 100-display_score], 
-                                    colors=colors, startangle=90,
-                                    wedgeprops=dict(width=0.4))
-        ax_gauge.text(0, 0, f'{display_score:.0f}%', ha='center', va='center', 
-                     fontsize=16, weight='bold', color='white')
-        ax_gauge.text(0, -0.3, gauge_label, ha='center', va='center', 
-                     fontsize=10, color='white')
-        
+        wedges, texts = ax_gauge.pie([display_score, max(0.1, 100-display_score)], 
+                                     colors=colors, startangle=90,
+                                     wedgeprops=dict(width=0.4))
+        ax_gauge.text(0, 0, f'{display_score:.0f}%', ha='center', va='center',
+                      fontsize=16, weight='bold', color='white')
+        ax_gauge.text(0, -0.35, gauge_label, ha='center', va='center', 
+                      fontsize=9, color='white', weight='bold') 
         gauge_plot_b64 = plot_to_base64(fig_gauge)
-        
-        # 3. Feature Importance (Top 3)
+
+        importance_values = np.zeros(len(X.columns)) # 
         if hasattr(model, 'feature_importances_'):
-            # Random Forest
             importance_values = model.feature_importances_
         elif hasattr(model, 'coef_'):
-            # Linear model
-            importance_values = np.abs(model.coef_)
+            importance_values = np.abs(model.coef_[0] if model.coef_.ndim > 1 and len(model.coef_) > 0 else model.coef_)
+
+        importance_html = "<div class='feature-importance'><h4>Top 3 Features</h4>"
+        if len(importance_values) == len(X.columns): 
+            try:
+                feature_importance = pd.Series(importance_values, index=X.columns).sort_values(ascending=False)
+                top_3_features = feature_importance.head(3)
+
+                if not top_3_features.empty:
+                    max_importance = top_3_features.iloc[0] if top_3_features.iloc[0] > 1e-9 else 1 
+
+                    for feature, importance in top_3_features.items():
+                        bar_width = min(100,(importance / max_importance) * 100) if max_importance > 0 else 0 
+                        importance_html += f"""
+                        <div class='importance-item'>
+                            <span class='feature-name'>{str(feature)[:25]}</span> <div class='importance-bar'>
+                                <div class='importance-fill' style='width: {bar_width:.2f}%'></div>
+                            </div>
+                            <span class='importance-value'>{importance:.3f}</span>
+                        </div>
+                        """
+                else:
+                    importance_html += "<p>No significant features found.</p>"
+            except Exception as e:
+                 importance_html += f"<p>Error calculating importances: {str(e)[:50]}</p>"
         else:
-            importance_values = np.ones(len(X.columns))
-        
-        feature_importance = pd.Series(importance_values, index=X.columns).sort_values(ascending=False)
-        top_3_features = feature_importance.head(3)
-        
-        importance_html = "<div class='feature-importance'><h4>Top 3 Important Features</h4>"
-        max_importance = top_3_features.iloc[0] if len(top_3_features) > 0 else 1
-        
-        for feature, importance in top_3_features.items():
-            bar_width = (importance / max_importance) * 100
-            importance_html += f"""
-            <div class='importance-item'>
-                <span class='feature-name'>{feature}</span>
-                <div class='importance-bar'>
-                    <div class='importance-fill' style='width: {bar_width}%'></div>
-                </div>
-                <span class='importance-value'>{importance:.3f}</span>
-            </div>
-            """
+             importance_html += "<p>Could not match importances to features.</p>"
         importance_html += "</div>"
-        
+
         return f"""
         <div class="model-diagnostics-container">
             <div class="diag-grid">
-                <div class="residual-section">
-                    <h4>Residuals</h4>
-                    <img src='{residual_plot_b64}' alt='Residual Plot'>
-                    <p class="pattern-check">{residual_pattern}</p>
-                </div>
-                <div class="cv-score-section">  
-                    <h4>CV {score_type}</h4>
-                    <img src='{gauge_plot_b64}' alt='CV Score Gauge'>
+                <div class="residual-section"> <h4>{'Residuals' if is_target_numeric and not is_classification_model else 'Diagnostic Info'}</h4>
+                    {diagnostic_plot_html} {diagnostic_label_html} </div>
+                <div class="cv-score-section">
+                    <h4>{score_type}</h4> <img src='{gauge_plot_b64}' alt='CV Score Gauge'>
                     <p class="cv-detail">±{cv_std:.2f} std</p>
                 </div>
                 <div class="importance-section">
