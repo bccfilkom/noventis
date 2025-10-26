@@ -8,7 +8,7 @@ from IPython.display import HTML
 from io import BytesIO
 from pathlib import Path
 
-# FLAML imports with fallback
+
 try:
     from flaml import AutoML as FLAMLAutoML
 except ImportError:
