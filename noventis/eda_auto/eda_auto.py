@@ -135,25 +135,18 @@ class NoventisAutoEDA:
     def _business_panel_data_quality_roi(self) -> str:
         """
         Generates business-focused data quality ROI dashboard panel.
-        
-        Creates a comprehensive quality assessment with:
-        - Overall quality score gauge (0-100%)
-        - Missing data statistics
-        - Outlier detection summary
-        - Duplicate row counts
-        - Top 5 columns with missing values (bar chart)
-        - Top 5 columns with outliers (bar chart)
-        
-        Returns:
-            str: HTML string containing the complete ROI dashboard panel.
         """
-        missing_cells = self.df.isnull().sum().sum(); missing_pct = (missing_cells / self.df.size) * 100
-        outliers_count = self._count_total_outliers(); duplicates_count = self.df.duplicated().sum()
+        missing_cells = self.df.isnull().sum().sum()
+        missing_pct = (missing_cells / self.df.size) * 100
+        outliers_count = self._count_total_outliers()
+        duplicates_count = self.df.duplicated().sum()
         quality_score = max(0, 100 - (missing_pct * 1.5) - (duplicates_count / len(self.df) * 100) - (outliers_count / self.df.size * 100 * 2.0))
+        
         fig, ax = plt.subplots(figsize=(5, 5), subplot_kw={'aspect': 'equal'})
         wedges, texts = ax.pie([quality_score, 100 - quality_score], wedgeprops=dict(width=0.45), startangle=90, colors=['#58A6FF', '#30363D'])
         ax.text(0, 0, f'{quality_score:.0f}%', ha='center', va='center', fontsize=32, weight="bold", color='#FFFFFF')
         plot_b64 = plot_to_base64(fig)
+        
         kpi_html = f"""<div class="biz-kpi-container"><div class="biz-kpi-item"><span class="kpi-label">Missing Cells</span><span class="kpi-value-small">{missing_cells:,} ({missing_pct:.2f}%)</span></div><div class="biz-kpi-item"><span class="kpi-label">Outliers Detected</span><span class="kpi-value-small">{outliers_count:,}</span></div><div class="biz-kpi-item"><span class="kpi-label">Duplicate Rows</span><span class="kpi-value-small">{duplicates_count:,}</span></div></div>"""
         top_section_html = f"<div class='biz-panel-split'><div class='biz-gauge-container'><img src='{plot_b64}'></div><div class='biz-kpi-wrapper'>{kpi_html}</div></div>"
         
@@ -161,22 +154,32 @@ class NoventisAutoEDA:
         top_missing = missing_pct_col[missing_pct_col > 0].nlargest(5)
         missing_plot_html = ""
         if not top_missing.empty:
-            fig_miss, ax_miss = plt.subplots(figsize=(8, 4)); sns.barplot(x=top_missing.values, y=top_missing.index, ax=ax_miss, color='#58A6FF', orient='h')
-            ax_miss.set_title('Top 5 Columns with Missing Data', fontsize=12); ax_miss.set_xlabel('Percentage Missing (%)', fontsize=10)
-            ax_miss.tick_params(axis='x', labelsize=10); ax_miss.tick_params(axis='y', labelsize=10)
+            fig_miss, ax_miss = plt.subplots(figsize=(8, 4))
+            sns.barplot(x=top_missing.values, y=top_missing.index, ax=ax_miss, color='#58A6FF', orient='h')
+            ax_miss.set_title('Top 5 Columns with Missing Data', fontsize=12)
+            ax_miss.set_xlabel('Percentage Missing (%)', fontsize=10)
+            ax_miss.tick_params(axis='x', labelsize=10)
+            ax_miss.tick_params(axis='y', labelsize=10)
             missing_plot_html = plot_to_base64(fig_miss)
         
         outlier_counts = {}
         for col in self.numeric_cols_:
-            Q1, Q3 = self.df[col].quantile(0.25), self.df[col].quantile(0.75); IQR = Q3 - Q1; lower_bound, upper_bound = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
-            outliers = self.df[(self.df[col] < lower_bound) | (self.df[col] > upper_bound)]; outlier_counts[col] = len(outliers)
+            Q1, Q3 = self.df[col].quantile(0.25), self.df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound, upper_bound = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
+            outliers = self.df[(self.df[col] < lower_bound) | (self.df[col] > upper_bound)]
+            outlier_counts[col] = len(outliers)
+        
         top_outliers = pd.Series(outlier_counts).nlargest(5)
         top_outliers = top_outliers[top_outliers > 0]
         outlier_plot_html = ""
         if not top_outliers.empty:
-            fig_out, ax_out = plt.subplots(figsize=(8, 4)); sns.barplot(x=top_outliers.values, y=top_outliers.index, ax=ax_out, color='#F78166', orient='h')
-            ax_out.set_title('Top 5 Columns with Most Outliers', fontsize=12); ax_out.set_xlabel('Number of Outliers', fontsize=10)
-            ax_out.tick_params(axis='x', labelsize=10); ax_out.tick_params(axis='y', labelsize=10)
+            fig_out, ax_out = plt.subplots(figsize=(8, 4))
+            sns.barplot(x=top_outliers.values, y=top_outliers.index, ax=ax_out, color='#F78166', orient='h')
+            ax_out.set_title('Top 5 Columns with Most Outliers', fontsize=12)
+            ax_out.set_xlabel('Number of Outliers', fontsize=10)
+            ax_out.tick_params(axis='x', labelsize=10)
+            ax_out.tick_params(axis='y', labelsize=10)
             outlier_plot_html = plot_to_base64(fig_out)
         
         bottom_section_html = f"""
@@ -188,6 +191,117 @@ class NoventisAutoEDA:
         """
         return top_section_html + bottom_section_html
 
+    def _business_panel_customer_intelligence(self) -> str:
+        """
+        Generates customer intelligence panel showing segment impact analysis.
+        """
+        if not self.target or self.target not in self.numeric_cols_ or not self.categorical_cols_:
+            return "<div class='biz-panel-placeholder'><h4>Customer Intelligence</h4><p>Requires a numeric target and categorical features.</p></div>"
+        
+        segment_col = self._find_most_impactful_categorical()
+        if not segment_col:
+            return "<div class='biz-panel-placeholder'><h4>Customer Intelligence</h4><p>No suitable categorical feature found for segmentation.</p></div>"
+        
+        segment_impact = self.df.groupby(segment_col)[self.target].sum().nlargest(5)
+        fig, ax = plt.subplots(figsize=(6, 5), subplot_kw={'aspect': 'equal'})
+        wedges, texts, autotexts = ax.pie(segment_impact, labels=segment_impact.index, autopct='%1.1f%%', startangle=90, colors=sns.color_palette("Blues_r", len(segment_impact)))
+        plt.setp(autotexts, size=10, weight="bold", color="white")
+        ax.set_title(f"Impact by '{segment_col}'")
+        plot_b64 = plot_to_base64(fig)
+        
+        summary_html = "<h4>Revenue Impact:</h4>" + segment_impact.to_frame().to_html(
+            classes='styled-table-small',
+            formatters={self.target: '{:,.0f}'.format}
+        )
+        return f"<div class='biz-panel'><img src='{plot_b64}'>{summary_html}</div>"
+
+    def _business_panel_priority_matrix(self) -> str:
+        """
+        Generates priority matrix showing feature impact vs. data quality.
+        """
+        if not self.target or self.target not in self.numeric_cols_ or len(self.numeric_cols_) < 2:
+            return "<div class='biz-panel-placeholder'><h4>Priority Matrix</h4><p>Requires a numeric target to analyze feature impact.</p></div>"
+        
+        try:
+            # Calculate impact and quality
+            impact = self.df[self.numeric_cols_].corrwith(self.df[self.target]).abs().drop(self.target, errors='ignore')
+            quality = (1 - self.df[self.numeric_cols_].isnull().sum() / len(self.df)) * 100
+            
+            # Create matrix dataframe
+            matrix_df = pd.DataFrame({
+                'Impact': impact, 
+                'Quality (%)': quality.round(2)
+            }).dropna().sort_values(by="Impact", ascending=False)
+            
+            if matrix_df.empty:
+                return "<div class='biz-panel-placeholder'><h4>Priority Matrix</h4><p>Could not compute matrix.</p></div>"
+            
+            # Calculate medians
+            median_impact = matrix_df['Impact'].median()
+            median_quality = matrix_df['Quality (%)'].median()
+            
+            # Assign quadrants
+            def assign_quadrant(row):
+                if row['Impact'] >= median_impact and row['Quality (%)'] >= median_quality:
+                    return 'Focus Here'
+                if row['Impact'] >= median_impact and row['Quality (%)'] < median_quality:
+                    return 'Strategic Fix'
+                if row['Impact'] < median_impact and row['Quality (%)'] >= median_quality:
+                    return 'Easy Win'
+                return 'Low Priority'
+            
+            matrix_df['Priority Quadrant'] = matrix_df.apply(assign_quadrant, axis=1)
+            
+            # Define colors for quadrants
+            quadrant_colors = {
+                'Focus Here': '#28A745',
+                'Strategic Fix': '#FD7E14', 
+                'Easy Win': '#007BFF',
+                'Low Priority': '#6C757D'
+            }
+            
+            # Build HTML table manually with proper styling
+            table_html = "<table class='styled-table'>"
+            table_html += "<thead><tr><th>Feature</th><th>Impact</th><th>Quality (%)</th><th>Priority Quadrant</th></tr></thead>"
+            table_html += "<tbody>"
+            
+            for idx, row in matrix_df.iterrows():
+                quadrant = row['Priority Quadrant']
+                bg_color = quadrant_colors.get(quadrant, '#6C757D')
+                
+                table_html += f"""
+                <tr>
+                    <th>{idx}</th>
+                    <td>{row['Impact']:.2f}</td>
+                    <td>{row['Quality (%)']:.2f}</td>
+                    <td style='background-color: {bg_color}; color: white; font-weight: bold; text-align: center;'>
+                        {quadrant}
+                    </td>
+                </tr>
+                """
+            
+            table_html += "</tbody></table>"
+            
+            return f"<div class='table-scroll-wrapper' style='max-height: 500px;'>{table_html}</div>"
+            
+        except Exception as e:
+            return f"<div class='biz-panel-placeholder'><h4>Priority Matrix</h4><p>Error computing matrix: {str(e)}</p></div>"
+
+    def _generate_business_impact_dashboard(self) -> str:
+            """
+            Generates complete business impact dashboard combining all business panels.
+            
+            Returns:
+                str: HTML string containing three-panel business dashboard:
+                    - Data Quality ROI panel
+                    - Customer Intelligence panel
+                    - Priority Matrix panel
+            """
+            panel1 = self._business_panel_data_quality_roi()
+            panel2 = self._business_panel_customer_intelligence()
+            panel3 = self._business_panel_priority_matrix()
+            return f"""<div class="biz-dashboard-grid"><div class="grid-item"><h2>Data Quality ROI</h2>{panel1}</div><div class="grid-item"><h2>Customer Intelligence</h2>{panel2}</div><div class="grid-item"><h2>Priority Matrix</h2>{panel3}</div></div>"""
+            
     def _business_panel_customer_intelligence(self) -> str:
         """
         Generates customer intelligence panel showing segment impact analysis.
@@ -228,40 +342,74 @@ class NoventisAutoEDA:
         Returns:
             str: HTML string containing styled table with priority classifications.
         """
-        if not self.target or self.target not in self.numeric_cols_ or len(self.numeric_cols_) < 2: return "<div class='biz-panel-placeholder'><h4>Priority Matrix</h4><p>Requires a numeric target to analyze feature impact.</p></div>"
-        impact = self.df[self.numeric_cols_].corrwith(self.df[self.target]).abs().drop(self.target, errors='ignore')
-        quality = (1 - self.df[self.numeric_cols_].isnull().sum() / len(self.df)) * 100
-        matrix_df = pd.DataFrame({'Impact': impact, 'Quality (%)': quality.round(2)}).dropna().sort_values(by="Impact", ascending=False)
-        if matrix_df.empty: return "<div class='biz-panel-placeholder'><h4>Priority Matrix</h4><p>Could not compute matrix.</p></div>"
-        median_impact = matrix_df['Impact'].median(); median_quality = matrix_df['Quality (%)'].median()
-        def assign_quadrant(row):
-            if row['Impact'] >= median_impact and row['Quality (%)'] >= median_quality: return 'Focus Here'
-            if row['Impact'] >= median_impact and row['Quality (%)'] < median_quality: return 'Strategic Fix'
-            if row['Impact'] < median_impact and row['Quality (%)'] >= median_quality: return 'Easy Win'
-            return 'Low Priority'
-        matrix_df['Priority Quadrant'] = matrix_df.apply(assign_quadrant, axis=1)
-        def style_quadrant(quadrant):
-            colors = {'Focus Here': '#28A745', 'Strategic Fix': '#FD7E14', 'Easy Win': '#007BFF', 'Low Priority': '#6C757D'}
-            return f"background-color: {colors.get(quadrant, '')}; color: white; font-weight: bold;"
-        styler = matrix_df.style.map(style_quadrant, subset=['Priority Quadrant'])\
-                               .format({'Impact': "{:.2f}", 'Quality (%)': "{:.2f}"})
-        table_html = styler.to_html(classes='styled-table')
-        return f"<div class='table-scroll-wrapper' style='max-height: 500px;'>{table_html}</div>"
-
-    def _generate_business_impact_dashboard(self) -> str:
-        """
-        Generates complete business impact dashboard combining all business panels.
+        if not self.target or self.target not in self.numeric_cols_ or len(self.numeric_cols_) < 2:
+            return "<div class='biz-panel-placeholder'><h4>Priority Matrix</h4><p>Requires a numeric target to analyze feature impact.</p></div>"
         
-        Returns:
-            str: HTML string containing three-panel business dashboard:
-                - Data Quality ROI panel
-                - Customer Intelligence panel
-                - Priority Matrix panel
-        """
-        panel1 = self._business_panel_data_quality_roi()
-        panel2 = self._business_panel_customer_intelligence()
-        panel3 = self._business_panel_priority_matrix()
-        return f"""<div class="biz-dashboard-grid"><div class="grid-item"><h2>Data Quality ROI</h2>{panel1}</div><div class="grid-item"><h2>Customer Intelligence</h2>{panel2}</div><div class="grid-item"><h2>Priority Matrix</h2>{panel3}</div></div>"""
+        try:
+            # Calculate impact and quality
+            impact = self.df[self.numeric_cols_].corrwith(self.df[self.target]).abs().drop(self.target, errors='ignore')
+            quality = (1 - self.df[self.numeric_cols_].isnull().sum() / len(self.df)) * 100
+            
+            # Create matrix dataframe
+            matrix_df = pd.DataFrame({
+                'Impact': impact, 
+                'Quality (%)': quality.round(2)
+            }).dropna().sort_values(by="Impact", ascending=False)
+            
+            if matrix_df.empty:
+                return "<div class='biz-panel-placeholder'><h4>Priority Matrix</h4><p>Could not compute matrix.</p></div>"
+            
+            # Calculate medians
+            median_impact = matrix_df['Impact'].median()
+            median_quality = matrix_df['Quality (%)'].median()
+            
+            # Assign quadrants
+            def assign_quadrant(row):
+                if row['Impact'] >= median_impact and row['Quality (%)'] >= median_quality:
+                    return 'Focus Here'
+                if row['Impact'] >= median_impact and row['Quality (%)'] < median_quality:
+                    return 'Strategic Fix'
+                if row['Impact'] < median_impact and row['Quality (%)'] >= median_quality:
+                    return 'Easy Win'
+                return 'Low Priority'
+            
+            matrix_df['Priority Quadrant'] = matrix_df.apply(assign_quadrant, axis=1)
+            
+            # Define colors for quadrants
+            quadrant_colors = {
+                'Focus Here': '#28A745',
+                'Strategic Fix': '#FD7E14', 
+                'Easy Win': '#007BFF',
+                'Low Priority': '#6C757D'
+            }
+            
+            # Build HTML table manually with proper styling
+            table_html = "<table class='styled-table'>"
+            table_html += "<thead><tr><th>Feature</th><th>Impact</th><th>Quality (%)</th><th>Priority Quadrant</th></tr></thead>"
+            table_html += "<tbody>"
+            
+            for idx, row in matrix_df.iterrows():
+                quadrant = row['Priority Quadrant']
+                bg_color = quadrant_colors.get(quadrant, '#6C757D')
+                
+                table_html += f"""
+                <tr>
+                    <th>{idx}</th>
+                    <td>{row['Impact']:.2f}</td>
+                    <td>{row['Quality (%)']:.2f}</td>
+                    <td style='background-color: {bg_color}; color: white; font-weight: bold; text-align: center;'>
+                        {quadrant}
+                    </td>
+                </tr>
+                """
+            
+            table_html += "</tbody></table>"
+            
+            return f"<div class='table-scroll-wrapper' style='max-height: 500px;'>{table_html}</div>"
+            
+        except Exception as e:
+            return f"<div class='biz-panel-placeholder'><h4>Priority Matrix</h4><p>Error computing matrix: {str(e)}</p></div>"
+
         
     def _generate_overview(self) -> str:
         """
