@@ -225,16 +225,10 @@ class NoventisOutlierHandler:
 
     def plot_comparison(self, max_cols: int = 1):
 
-            """Plot before/after comparison of outlier handling results."""
         if not self.is_fitted or self._original_df_snapshot is None:  # ✓
             return None 
-
-        """Plot before/after comparison of outlier handling results."""
-        if not self.is_fitted_ or not self._plot_data_snapshot:
-            # Return None if the handler hasn't been fitted or no original data snapshot exists
-            return None
         
-        # Select columns where outlier handling was actually applied (method is not 'none')
+
         cols_to_plot = [col for col, method in self.methods_.items() if method != 'none']
         if not cols_to_plot:
             # Return None if no columns were actually processed for outliers
