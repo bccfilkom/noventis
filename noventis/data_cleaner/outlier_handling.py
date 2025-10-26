@@ -223,91 +223,91 @@ class NoventisOutlierHandler:
         return summary_html
 
     def plot_comparison(self, max_cols: int = 1):
-    """Plot before/after comparison of outlier handling results."""
-    if not self.is_fitted_ or not self._plot_data_snapshot:
-        # Return None if the handler hasn't been fitted or no original data snapshot exists
-        return None
-    
-    # Select columns where outlier handling was actually applied (method is not 'none')
-    cols_to_plot = [col for col, method in self.methods_.items() if method != 'none']
-    if not cols_to_plot:
-        # Return None if no columns were actually processed for outliers
-        return None
+        """Plot before/after comparison of outlier handling results."""
+        if not self.is_fitted_ or not self._plot_data_snapshot:
+            # Return None if the handler hasn't been fitted or no original data snapshot exists
+            return None
         
-    # Limit to the first relevant column based on max_cols=1 default or input
-    num_cols_to_plot = min(max_cols, len(cols_to_plot))
-    selected_cols = cols_to_plot[:num_cols_to_plot]
+        # Select columns where outlier handling was actually applied (method is not 'none')
+        cols_to_plot = [col for col, method in self.methods_.items() if method != 'none']
+        if not cols_to_plot:
+            # Return None if no columns were actually processed for outliers
+            return None
+            
+        # Limit to the first relevant column based on max_cols=1 default or input
+        num_cols_to_plot = min(max_cols, len(cols_to_plot))
+        selected_cols = cols_to_plot[:num_cols_to_plot]
 
-    figs = []  # Store figures if max_cols > 1 in the future
+        figs = []  # Store figures if max_cols > 1 in the future
 
-    for col_to_plot in selected_cols:
-        # FIXED: Create DataFrame from the snapshot dictionary
-        original_data = pd.DataFrame({col: self._plot_data_snapshot[col] 
-                                     for col in self._plot_data_snapshot.keys()})
-        
-        # Generate transformed data
-        transformed_data = self.transform(original_data.copy())
+        for col_to_plot in selected_cols:
+            # FIXED: Create DataFrame from the snapshot dictionary
+            original_data = pd.DataFrame({col: self._plot_data_snapshot[col] 
+                                        for col in self._plot_data_snapshot.keys()})
+            
+            # Generate transformed data
+            transformed_data = self.transform(original_data.copy())
 
-        # Check if the column still exists after potential drops
-        if col_to_plot not in original_data.columns or col_to_plot not in transformed_data.columns:
-            print(f"Warning: Column '{col_to_plot}' not found in original or transformed data for plotting. Skipping.")
-            continue
+            # Check if the column still exists after potential drops
+            if col_to_plot not in original_data.columns or col_to_plot not in transformed_data.columns:
+                print(f"Warning: Column '{col_to_plot}' not found in original or transformed data for plotting. Skipping.")
+                continue
 
-        color_before, color_after = '#58A6FF', '#F78166'
-        bg_color, text_color = '#0D1117', '#C9D1D9'
+            color_before, color_after = '#58A6FF', '#F78166'
+            bg_color, text_color = '#0D1117', '#C9D1D9'
 
-        fig = plt.figure(figsize=(16, 8), facecolor=bg_color)
-        gs = fig.add_gridspec(2, 2, height_ratios=(3, 1), hspace=0.05)
-        fig.suptitle(f"Outlier Handling Comparison for '{col_to_plot}' (Method: {self.methods_[col_to_plot].upper()})",
-                    fontsize=20, color=text_color, weight='bold')
+            fig = plt.figure(figsize=(16, 8), facecolor=bg_color)
+            gs = fig.add_gridspec(2, 2, height_ratios=(3, 1), hspace=0.05)
+            fig.suptitle(f"Outlier Handling Comparison for '{col_to_plot}' (Method: {self.methods_[col_to_plot].upper()})",
+                        fontsize=20, color=text_color, weight='bold')
 
-        # --- BEFORE ---
-        ax_hist_before = fig.add_subplot(gs[0, 0])
-        ax_box_before = fig.add_subplot(gs[1, 0], sharex=ax_hist_before)
-        
-        try:
-            sns.histplot(data=original_data, x=col_to_plot, kde=True, ax=ax_hist_before, color=color_before)
-            sns.boxplot(data=original_data, x=col_to_plot, ax=ax_box_before, color=color_before)
-            ax_hist_before.set_title("Before", color=text_color, fontsize=14)
-            plt.setp(ax_hist_before.get_xticklabels(), visible=False)
-        except Exception as e:
-            print(f"Warning: Could not plot 'Before' for {col_to_plot}. Error: {e}")
-            ax_hist_before.text(0.5, 0.5, "Error plotting 'Before'", ha='center', va='center', color='red')
-            ax_box_before.text(0.5, 0.5, "Error plotting 'Before'", ha='center', va='center', color='red')
+            # --- BEFORE ---
+            ax_hist_before = fig.add_subplot(gs[0, 0])
+            ax_box_before = fig.add_subplot(gs[1, 0], sharex=ax_hist_before)
+            
+            try:
+                sns.histplot(data=original_data, x=col_to_plot, kde=True, ax=ax_hist_before, color=color_before)
+                sns.boxplot(data=original_data, x=col_to_plot, ax=ax_box_before, color=color_before)
+                ax_hist_before.set_title("Before", color=text_color, fontsize=14)
+                plt.setp(ax_hist_before.get_xticklabels(), visible=False)
+            except Exception as e:
+                print(f"Warning: Could not plot 'Before' for {col_to_plot}. Error: {e}")
+                ax_hist_before.text(0.5, 0.5, "Error plotting 'Before'", ha='center', va='center', color='red')
+                ax_box_before.text(0.5, 0.5, "Error plotting 'Before'", ha='center', va='center', color='red')
 
-        # --- AFTER ---
-        ax_hist_after = fig.add_subplot(gs[0, 1])
-        ax_box_after = fig.add_subplot(gs[1, 1], sharex=ax_hist_after)
+            # --- AFTER ---
+            ax_hist_after = fig.add_subplot(gs[0, 1])
+            ax_box_after = fig.add_subplot(gs[1, 1], sharex=ax_hist_after)
 
-        try:
-            if transformed_data[col_to_plot].empty:
-                ax_hist_after.text(0.5, 0.5, "No data remaining after outlier removal", 
-                                  ha='center', va='center', color=text_color)
-                ax_box_after.text(0.5, 0.5, "No data remaining", 
-                                 ha='center', va='center', color=text_color)
-            else:
-                sns.histplot(data=transformed_data, x=col_to_plot, kde=True, ax=ax_hist_after, color=color_after)
-                sns.boxplot(data=transformed_data, x=col_to_plot, ax=ax_box_after, color=color_after)
-            ax_hist_after.set_title("After", color=text_color, fontsize=14)
-            plt.setp(ax_hist_after.get_xticklabels(), visible=False)
-        except Exception as e:
-            print(f"Warning: Could not plot 'After' for {col_to_plot}. Error: {e}")
-            ax_hist_after.text(0.5, 0.5, "Error plotting 'After'", ha='center', va='center', color='red')
-            ax_box_after.text(0.5, 0.5, "Error plotting 'After'", ha='center', va='center', color='red')
+            try:
+                if transformed_data[col_to_plot].empty:
+                    ax_hist_after.text(0.5, 0.5, "No data remaining after outlier removal", 
+                                    ha='center', va='center', color=text_color)
+                    ax_box_after.text(0.5, 0.5, "No data remaining", 
+                                    ha='center', va='center', color=text_color)
+                else:
+                    sns.histplot(data=transformed_data, x=col_to_plot, kde=True, ax=ax_hist_after, color=color_after)
+                    sns.boxplot(data=transformed_data, x=col_to_plot, ax=ax_box_after, color=color_after)
+                ax_hist_after.set_title("After", color=text_color, fontsize=14)
+                plt.setp(ax_hist_after.get_xticklabels(), visible=False)
+            except Exception as e:
+                print(f"Warning: Could not plot 'After' for {col_to_plot}. Error: {e}")
+                ax_hist_after.text(0.5, 0.5, "Error plotting 'After'", ha='center', va='center', color='red')
+                ax_box_after.text(0.5, 0.5, "Error plotting 'After'", ha='center', va='center', color='red')
 
-        # Style all axes
-        for ax in [ax_hist_before, ax_box_before, ax_hist_after, ax_box_after]:
-            ax.set_facecolor(bg_color)
-            ax.tick_params(colors=text_color, which='both')
-            for spine in ax.spines.values(): 
-                spine.set_edgecolor(text_color)
-            ax.xaxis.label.set_color(text_color)
-            ax.yaxis.label.set_color(text_color)
-            ax.set_xlabel('')
-            ax.set_ylabel('')
+            # Style all axes
+            for ax in [ax_hist_before, ax_box_before, ax_hist_after, ax_box_after]:
+                ax.set_facecolor(bg_color)
+                ax.tick_params(colors=text_color, which='both')
+                for spine in ax.spines.values(): 
+                    spine.set_edgecolor(text_color)
+                ax.xaxis.label.set_color(text_color)
+                ax.yaxis.label.set_color(text_color)
+                ax.set_xlabel('')
+                ax.set_ylabel('')
 
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-        figs.append(fig)
+            plt.tight_layout(rect=[0, 0, 1, 0.95])
+            figs.append(fig)
 
-    # Return the single figure if max_cols=1, otherwise return list
-    return figs[0] if len(figs) == 1 else figs
+        # Return the single figure if max_cols=1, otherwise return list
+        return figs[0] if len(figs) == 1 else figs
