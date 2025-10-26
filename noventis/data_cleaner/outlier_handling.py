@@ -34,6 +34,7 @@ class NoventisOutlierHandler:
         
         self.quality_report_: Dict[str, Any] = {}
         self._plot_data_snapshot: Dict[str, pd.Series] = {}  
+        self._original_df_snapshot: Optional[pd.DataFrame] = None 
 
     def _choose_auto_method(self, col_data: pd.Series) -> str:
         """Helper function to choose automatic method."""
@@ -223,6 +224,11 @@ class NoventisOutlierHandler:
         return summary_html
 
     def plot_comparison(self, max_cols: int = 1):
+
+            """Plot before/after comparison of outlier handling results."""
+        if not self.is_fitted or self._original_df_snapshot is None:  # ✓
+            return None 
+
         """Plot before/after comparison of outlier handling results."""
         if not self.is_fitted_ or not self._plot_data_snapshot:
             # Return None if the handler hasn't been fitted or no original data snapshot exists
@@ -233,6 +239,7 @@ class NoventisOutlierHandler:
         if not cols_to_plot:
             # Return None if no columns were actually processed for outliers
             return None
+
             
         # Limit to the first relevant column based on max_cols=1 default or input
         num_cols_to_plot = min(max_cols, len(cols_to_plot))
