@@ -21,7 +21,6 @@ warnings.filterwarnings('ignore')
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
-
 import optuna
 import shap
 optuna.logging.set_verbosity(optuna.logging.ERROR)
@@ -384,20 +383,7 @@ class NoventisManualML:
         return run_dir
 
     def _load_single_model(self, name: str) -> Any:
-        """
-        Initialize a model with default configuration.
-        
-        Handles model-specific settings like verbosity and evaluation metrics.
-        
-        Args:
-            name: Model name from MODEL_CONFIG
-            
-        Returns:
-            Initialized model instance
-            
-        Raises:
-            ValueError: If model name not recognized for task type
-        """
+        """Initialize a model with default configuration."""
         name = name.lower()
         config = MODEL_CONFIG[self.task_type].get(name)
         
@@ -411,11 +397,9 @@ class NoventisManualML:
         model_class = config['model']
         params = {}
         
-        # Add random_state if model supports it
         if 'random_state' in model_class().get_params():
             params['random_state'] = self.random_state
         
-        # Model-specific configurations
         if name == 'catboost':
             params['verbose'] = 0
         elif name == 'xgboost':
@@ -448,16 +432,7 @@ class NoventisManualML:
         }
 
     def _eval_regression(self, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
-        """
-        Calculate comprehensive regression metrics.
-        
-        Args:
-            y_true: Ground truth values
-            y_pred: Predicted values
-            
-        Returns:
-            Dictionary with MAE, MSE, RMSE, and R² score
-        """
+        """Calculate comprehensive regression metrics."""
         mse = mean_squared_error(y_true, y_pred)
         return {
             'mae': mean_absolute_error(y_true, y_pred),
@@ -472,20 +447,7 @@ class NoventisManualML:
         X_train: np.ndarray, 
         y_train: pd.Series
     ) -> Dict[str, Any]:
-        """
-        Perform Bayesian hyperparameter optimization using Optuna.
-        
-        Uses cross-validation to evaluate hyperparameter combinations
-        and MedianPruner to stop unpromising trials early.
-        
-        Args:
-            model_name: Name of model to tune
-            X_train: Training features (preprocessed)
-            y_train: Training labels
-            
-        Returns:
-            Dictionary of best hyperparameters found
-        """
+        """Perform Bayesian hyperparameter optimization using Optuna."""
         logging.info(f"Starting hyperparameter tuning for {model_name.upper()}...")
         
         param_func = MODEL_CONFIG[self.task_type][model_name.lower()].get('params')
@@ -497,13 +459,10 @@ class NoventisManualML:
             return {}
 
         def objective(trial: optuna.Trial) -> float:
-            """Optuna objective function for single trial evaluation."""
-            # Get hyperparameters for this trial
             params = param_func(trial)
             model = self._load_single_model(model_name)
             model.set_params(**params)
             
-            # Setup cross-validation strategy
             if self.task_type == 'classification':
                 if self.cv_strategy == 'repeated':
                     cv = RepeatedStratifiedKFold(
@@ -524,7 +483,6 @@ class NoventisManualML:
                     random_state=self.random_state
                 )
 
-            # Evaluate on all folds
             scores = []
             for train_idx, val_idx in cv.split(X_train, y_train):
                 X_train_fold = X_train[train_idx]
@@ -535,7 +493,6 @@ class NoventisManualML:
                 model.fit(X_train_fold, y_train_fold)
                 preds = model.predict(X_val_fold)
                 
-                # Calculate primary metric
                 if self.task_type == 'classification':
                     metrics = self._eval_classification(y_val_fold, preds)
                     metric = self.DEFAULT_CLASSIFICATION_METRIC
@@ -547,7 +504,6 @@ class NoventisManualML:
             
             return np.mean(scores)
 
-        # Run Optuna optimization
         pruner = optuna.pruners.MedianPruner(n_warmup_steps=5)
         study = optuna.create_study(direction='maximize', pruner=pruner)
         study.optimize(
@@ -558,7 +514,6 @@ class NoventisManualML:
             show_progress_bar=False
         )
         
-        # Display optimization visualizations if requested
         if self.show_tuning_plots:
             self._show_tuning_insights(study, model_name)
         
@@ -566,21 +521,10 @@ class NoventisManualML:
         return study.best_params
 
     def _show_tuning_insights(self, study: optuna.Study, model_name: str) -> None:
-        """
-        Display Optuna optimization visualizations.
-        
-        Creates and optionally saves:
-        - Optimization history plot
-        - Parameter importance plot
-        
-        Args:
-            study: Completed Optuna study
-            model_name: Model name for plot titles
-        """
+        """Display Optuna optimization visualizations."""
         logging.info(f"Displaying tuning visualizations for {model_name.upper()}...")
         
         try:
-            # Optimization history
             fig1 = optuna.visualization.plot_optimization_history(study)
             fig1.update_layout(title=f'Optimization History for {model_name}')
             if self.output_dir:
@@ -591,7 +535,6 @@ class NoventisManualML:
                 fig1.write_image(save_path)
             fig1.show()
 
-            # Parameter importance
             fig2 = optuna.visualization.plot_param_importances(study)
             fig2.update_layout(title=f'Parameter Importances for {model_name}')
             if self.output_dir:
@@ -613,44 +556,22 @@ class NoventisManualML:
         X_test: np.ndarray, 
         y_test: pd.Series
     ) -> Dict[str, Any]:
-        """
-        Complete pipeline for training and evaluating a single model.
-        
-        Workflow:
-        1. Hyperparameter tuning (if enabled)
-        2. Model training with best/default parameters
-        3. Prediction on test set
-        4. Metric calculation
-        
-        Args:
-            model_name: Name of model to train
-            X_train: Training features (preprocessed)
-            y_train: Training labels
-            X_test: Test features (preprocessed)
-            y_test: Test labels
-            
-        Returns:
-            Dictionary with model, predictions, metrics, and metadata
-        """
+        """Complete pipeline for training and evaluating a single model."""
         logging.info(f"Processing model: {model_name.upper()}")
         
-        # Hyperparameter tuning
         best_params = {}
         if self.tune_hyperparameters:
             best_params = self._tune_with_optuna(model_name, X_train, y_train)
 
-        # Initialize and configure model
         model = self._load_single_model(model_name)
         if best_params:
             model.set_params(**best_params)
 
-        # Train model
         start_time = time.time()
         model.fit(X_train, y_train)
         training_time = time.time() - start_time
         logging.info(f"Training finished in {training_time:.2f} seconds.")
         
-        # Generate predictions
         predictions = model.predict(X_test)
         y_pred_proba = (
             model.predict_proba(X_test) 
@@ -658,26 +579,24 @@ class NoventisManualML:
             else None
         )
         
-        # Calculate metrics
         if self.task_type == 'classification':
             metrics = self._eval_classification(y_test, predictions)
         else:
             metrics = self._eval_regression(y_test, predictions)
         
-        # Return comprehensive result dictionary matching AutoML structure
         return {
             'model_name': model_name,
-            'model': model,  # Changed from 'model_object' to match AutoML
+            'model': model,
             'predictions': predictions,
             'prediction_proba': y_pred_proba,
             'actual': y_test,
             'metrics': metrics,
-            'task_type': self.task_type,  # Added for consistency
+            'task_type': self.task_type,
             'training_time_seconds': training_time,
             'best_params': best_params,
-            'best_config': best_params,  # Alias for AutoML compatibility
-            'feature_importance': None,  # Placeholder
-            'best_estimator': model_name  # For consistency
+            'best_config': best_params,
+            'feature_importance': None,
+            'best_estimator': model_name
         }
 
     def fit(
@@ -690,7 +609,8 @@ class NoventisManualML:
         chosen_metric: Optional[str] = None,
         display_report: bool = True,
         use_data_cleaner: bool = False,
-        data_cleaner_object: Optional[Any] = None
+        data_cleaner_object: Optional[Any] = None,
+        auto_save_model: bool = True  
     ) -> Dict[str, Any]:
         """
         Train machine learning models with optional preprocessing and hyperparameter tuning.
@@ -800,6 +720,7 @@ class NoventisManualML:
             - Best model is selected based on primary metric
             - All results are stored in self.all_results and self.results
         """
+        
         logging.info("Starting NoventisManualML Training Pipeline")
         
         # Validate inputs
@@ -815,7 +736,6 @@ class NoventisManualML:
         X = df.drop(columns=[target_column])
         y = df[target_column]
         
-        # Determine which data cleaner to use
         cleaner_to_use = data_cleaner_object or self.data_cleaner_object
         use_builtin = use_data_cleaner or self.data_cleaner_bool
         
@@ -865,7 +785,6 @@ class NoventisManualML:
                 except ImportError:
                     from noventis import data_cleaner as dc_func
                 
-                # FIXED: Apply cleaner on full dataset BEFORE split
                 df_with_target = X.copy()
                 df_with_target[target_column] = y
                 
@@ -876,18 +795,14 @@ class NoventisManualML:
                     verbose=False
                 )
                 
-                # Extract cleaned features and target
                 X_cleaned = cleaner_instance._processed_df.drop(columns=[target_column], errors='ignore')
                 y_cleaned = df_cleaned[target_column] if target_column in df_cleaned.columns else y.loc[X_cleaned.index]
                 
-                # Ensure alignment
                 if len(X_cleaned) != len(y_cleaned):
-                    # Keep only matching indices
                     common_idx = X_cleaned.index.intersection(y_cleaned.index)
                     X_cleaned = X_cleaned.loc[common_idx]
                     y_cleaned = y_cleaned.loc[common_idx]
                 
-                # NOW do train-test split
                 X_train, X_test, y_train, y_test = train_test_split(
                     X_cleaned, y_cleaned, 
                     test_size=test_size, 
@@ -922,7 +837,6 @@ class NoventisManualML:
         
         logging.info(f"Data split complete: Train={len(X_train)}, Test={len(X_test)}")
         
-
         logging.info("Applying internal preprocessing (imputation + encoding)...")
         
         numeric_features = X_train.select_dtypes(include=np.number).columns.tolist()
@@ -1037,6 +951,13 @@ class NoventisManualML:
         logging.info(f"Best {primary_metric}: {best_score:.4f}")
         logging.info(f"Successfully trained: {len(successful_results)}/{len(model_list)} models")
         
+        if auto_save_model and self.output_dir:
+            try:
+                self.save_model()
+                logging.info(f"✓ Best model auto-saved successfully")
+            except Exception as e:
+                logging.warning(f"Could not auto-save model: {e}")
+        
         if compare:
             self._print_comparison()
         
@@ -1053,303 +974,13 @@ class NoventisManualML:
             'best_model_details': self.best_model_info,
             'all_model_results': self.all_results
         }
-
-    def _get_preprocessor_info(self) -> str:
-        """
-        Get formatted information about preprocessor configuration.
-        
-        Args:
-            None
-        
-        Returns:
-            str:
-                Description of preprocessing pipeline.
-                Format: "Numeric: SimpleImputer | Categorical: OneHotEncoder"
-                Returns "No preprocessor (raw data)" if preprocessor is None
-                Returns "Standard" if transformers exist but cannot be parsed
-        
-        Example:
-            >>> info = ml._get_preprocessor_info()
-            >>> print(info)
-            'Numeric: SimpleImputer | Categorical: OneHotEncoder'
-        """
-        if self.preprocessor is None:
-            return "No preprocessor (raw data)"
-        
-        transformers = self.preprocessor.transformers_
-        info_parts = []
-        
-        for name, transformer, columns in transformers:
-            if name == 'num':
-                info_parts.append(f"Numeric: {transformer.__class__.__name__}")
-            elif name == 'cat':
-                info_parts.append(f"Categorical: {transformer.__class__.__name__}")
-        
-        return " | ".join(info_parts) if info_parts else "Standard"
-
-    def get_results_dataframe(self) -> pd.DataFrame:
-        """
-        Get model comparison results as DataFrame.
-        
-        Returns DataFrame with models as index and metrics as columns,
-        sorted by primary metric (descending for better-is-higher metrics).
-        
-        Returns:
-            DataFrame with model performance comparison
-        """
-        if not self.all_results:
-            logging.warning(
-                "No results available. "
-                "Please run the pipeline first using .fit()."
-            )
-            return pd.DataFrame()
-        
-        # Build records from successful results
-        records = [
-            {'model': res['model_name'], **res['metrics']}
-            for res in self.all_results if 'error' not in res
-        ]
-        
-        if not records:
-            return pd.DataFrame()
-        
-        df = pd.DataFrame(records).set_index('model')
-        
-        primary_metric = (
-            self.DEFAULT_CLASSIFICATION_METRIC 
-            if self.task_type == 'classification' 
-            else self.DEFAULT_REGRESSION_METRIC
-        )
-        
-        is_higher_better = primary_metric in [
-            'f1_score', 'r2_score', 'accuracy', 'precision', 'recall'
-        ]
-        
-        return df.sort_values(by=primary_metric, ascending=not is_higher_better)
-
-    def _print_comparison(self) -> None:
-        """
-        Print formatted comparison table of all trained models.
-        """
-        if not self.all_results:
-            logging.warning("No results to compare.")
-            return
-        
-    
-        print("MODEL COMPARISON - ALL METRICS")
-        print(self.get_results_dataframe())
-
-    def _create_metric_plot(self, chosen_metric: Optional[str] = None) -> None:
-        """
-        Create bar chart comparing models by chosen metric.
-        
-        Highlights the best performing model in gold color.
-        
-        Args:
-            chosen_metric: Metric to plot (uses primary metric if None)
-        """
-        if not self.all_results:
-            logging.warning("No results to plot.")
-            return
-        
-        # Determine metric to plot
-        metric = chosen_metric or (
-            self.DEFAULT_CLASSIFICATION_METRIC 
-            if self.task_type == 'classification' 
-            else self.DEFAULT_REGRESSION_METRIC
-        )
-        
-        df_results = self.get_results_dataframe().reset_index()
-        
-        # Create bar chart
-        fig, ax = plt.subplots(figsize=(12, 8))
-        bars = ax.bar(
-            df_results['model'], 
-            df_results[metric],
-            color='steelblue',
-            alpha=0.8,
-            edgecolor='black',
-            linewidth=1.2
-        )
-        
-        ax.set_title(
-            f'Model Comparison - {metric.upper()}',
-            fontsize=16,
-            fontweight='bold',
-            pad=20
-        )
-        ax.set_xlabel('Models', fontsize=12, fontweight='bold')
-        ax.set_ylabel(metric.upper(), fontsize=12, fontweight='bold')
-        plt.xticks(rotation=45, ha='right')
-        ax.grid(axis='y', alpha=0.3, linestyle='--')
-        
-        # Add value labels on bars
-        for bar in bars:
-            yval = bar.get_height()
-            ax.text(
-                bar.get_x() + bar.get_width()/2.0,
-                yval + (df_results[metric].max() * 0.01),
-                f'{yval:.4f}',
-                ha='center',
-                va='bottom',
-                fontweight='bold'
-            )
-        
-        # Highlight best model in gold
-        is_higher_better = metric in [
-            'accuracy', 'precision', 'recall', 'f1_score', 'r2_score'
-        ]
-        best_val = (
-            df_results[metric].max() 
-            if is_higher_better 
-            else df_results[metric].min()
-        )
-        best_bar_index = df_results[df_results[metric] == best_val].index[0]
-        
-        bars[best_bar_index].set_color('gold')
-        bars[best_bar_index].set_edgecolor('darkorange')
-        bars[best_bar_index].set_linewidth(2)
-        
-        # Save plot if output directory specified
-        if self.output_dir:
-            plot_path = os.path.join(
-                self.output_dir, 'plots', 
-                f'metric_comparison_{metric}.png'
-            )
-            fig.savefig(plot_path, bbox_inches='tight', dpi=300)
-            logging.info(f"Plot saved to: {plot_path}")
-        
-        plt.tight_layout()
-        plt.show()
-
-    def save_model(self, filepath: Optional[str] = None) -> None:
-        """
-        Save best trained model to disk using pickle.
-        
-        Args:
-            filepath: Full path to save model. If None, uses output_dir
-            
-        Raises:
-            ValueError: If no model available or no valid save path
-        """
-        if not self.best_model_info:
-            raise ValueError("No best model available to save. Run fit() first.")
-        
-        model_to_save = self.best_model_info.get('model')
-        model_name = self.best_model_info['model_name']
-        
-        if filepath:
-            save_path = filepath
-        elif self.output_dir:
-            save_path = os.path.join(
-                self.output_dir, 'models', 
-                f'{model_name}_best_model.pkl'
-            )
-        else:
-            raise ValueError(
-                "Please provide a 'filepath' or set an 'output_dir' "
-                "during initialization."
-            )
-        
-        logging.info(f"Saving model '{model_name}' to {save_path}...")
-        with open(save_path, 'wb') as f:
-            pickle.dump(model_to_save, f)
-        logging.info("Model saved successfully.")
-
-    @staticmethod
-    def load_model(filepath: str) -> Any:
-        """
-        Load a saved model from disk.
-        
-        Args:
-            filepath: Path to saved model file
-            
-        Returns:
-            Loaded model object
-            
-        Raises:
-            FileNotFoundError: If file doesn't exist
-        """
-        if not os.path.exists(filepath):
-            raise FileNotFoundError(f"Model file not found: {filepath}")
-        
-        logging.info(f"Loading model from {filepath}...")
-        with open(filepath, 'rb') as f:
-            model = pickle.load(f)
-        logging.info("Model loaded successfully.")
-        return model
-
-    def predict(
-        self, 
-        X_new: Union[pd.DataFrame, np.ndarray], 
-        model_path: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Make predictions on new data (added to match AutoML interface).
-        
-        Args:
-            X_new: New features for prediction
-            model_path: Optional path to load specific model
-            
-        Returns:
-            Dictionary with predictions and probabilities (if classification)
-        """
-        # Load model from path or use trained model
-        model = (
-            self.load_model(model_path) 
-            if model_path 
-            else self.best_model_info.get('model')
-        )
-        
-        if model is None:
-            raise ValueError(
-                "No model available. Train first with fit() or specify model_path"
-            )
-        
-        # Preprocess new data
-        if isinstance(X_new, pd.DataFrame):
-            X_new_transformed = self.preprocessor.transform(X_new)
-        else:
-            X_new_transformed = X_new
-        
-        try:
-            predictions = model.predict(X_new_transformed)
-            logging.info(f"Prediction successful for {len(X_new)} samples")
-            
-            result = {'predictions': predictions}
-            
-            # Add probabilities for classification
-            if (self.task_type == "classification" and 
-                hasattr(model, 'predict_proba')):
-                result['probabilities'] = model.predict_proba(X_new_transformed)
-            
-            return result
-            
-        except Exception as e:
-            logging.error(f"Error during prediction: {e}")
-            return None
-
     def explain_model(
         self, 
         model_object: Optional[Any] = None, 
         plot_type: str = 'summary', 
         feature: Optional[str] = None
     ) -> None:
-        """
-        Generate SHAP-based model explanations.
-        
-        Creates interpretability visualizations showing how features
-        impact model predictions using SHAP values.
-        
-        Args:
-            model_object: Model to explain (uses best model if None)
-            plot_type: Type of SHAP plot ('summary', 'beeswarm', 'dependence')
-            feature: Feature name (required for dependence plots)
-            
-        Raises:
-            RuntimeError: If pipeline hasn't been run
-            ValueError: If feature not provided for dependence plot
-        """
+        """Generate SHAP-based model explanations."""
         if self.X_test is None:
             raise RuntimeError("The pipeline must be run before explaining the model.")
         
@@ -1361,14 +992,12 @@ class NoventisManualML:
         logging.info(f"Creating SHAP Explainer for {model_name}...")
 
         try:
-            # Prepare test data as DataFrame
             X_test_df = pd.DataFrame(
                 self.X_test.toarray() 
                 if hasattr(self.X_test, 'toarray') 
                 else self.X_test
             )
             
-            # Try to get feature names from preprocessor
             if self.preprocessor:
                 try:
                     feature_names = self.preprocessor.get_feature_names_out()
@@ -1379,7 +1008,6 @@ class NoventisManualML:
                         "Plots may use generic names."
                     )
             
-            # Create SHAP explainer and compute values
             explainer = shap.Explainer(model_to_explain, self.X_train)
             shap_values = explainer(X_test_df)
             
@@ -1387,7 +1015,6 @@ class NoventisManualML:
             logging.error(f"Failed to create SHAP explainer: {e}")
             return
         
-        # Generate requested plot type
         logging.info(f"Generating SHAP '{plot_type}' plot...")
         plt.figure()
         title = f"SHAP {plot_type.title()} Plot for {model_name}"
@@ -1417,15 +1044,7 @@ class NoventisManualML:
         plt.show()
 
     def _fig_to_base64(self, fig: plt.Figure) -> str:
-        """
-        Convert matplotlib figure to base64 string for HTML embedding.
-        
-        Args:
-            fig: Matplotlib figure object
-            
-        Returns:
-            Base64 encoded image with data URI prefix
-        """
+        """Convert matplotlib figure to base64 string for HTML embedding."""
         buf = io.BytesIO()
         fig.savefig(
             buf, 
@@ -1454,18 +1073,7 @@ class NoventisManualML:
         })
 
     def _create_classification_plots(self) -> Dict[str, str]:
-        """
-        Generate comprehensive classification analysis plots.
-        
-        Creates 4-panel visualization:
-        1. Confusion matrix (normalized)
-        2. ROC curve (binary only)
-        3. Precision-Recall curve (binary only)
-        4. Model comparison bar chart
-        
-        Returns:
-            Dictionary with plot name and base64 encoded image
-        """
+        """Generate comprehensive classification analysis plots."""
         plots = {}
         self._set_plot_style()
         
@@ -1474,7 +1082,6 @@ class NoventisManualML:
         y_pred = best_result['predictions']
         y_pred_proba = best_result.get('prediction_proba')
         
-        # Create 2x2 subplot grid
         fig, axes = plt.subplots(2, 2, figsize=(16, 14))
         fig.patch.set_facecolor('#0D1117')
         
@@ -1493,7 +1100,7 @@ class NoventisManualML:
         axes[0, 0].set_xlabel('Predicted Label', fontsize=11, fontweight='bold')
         axes[0, 0].set_ylabel('True Label', fontsize=11, fontweight='bold')
         
-        # Panel 2: ROC Curve (binary classification only)
+        # Panel 2: ROC Curve
         if y_pred_proba is not None and len(np.unique(y_true)) == 2:
             fpr, tpr, _ = roc_curve(y_true, y_pred_proba[:, 1])
             roc_auc = auc(fpr, tpr)
@@ -1530,7 +1137,7 @@ class NoventisManualML:
             axes[0, 1].set_xticks([])
             axes[0, 1].set_yticks([])
         
-        # Panel 3: Precision-Recall Curve (binary classification only)
+        # Panel 3: Precision-Recall Curve
         if y_pred_proba is not None and len(np.unique(y_true)) == 2:
             precision, recall, _ = precision_recall_curve(y_true, y_pred_proba[:, 1])
             
@@ -1588,7 +1195,6 @@ class NoventisManualML:
         )
         axes[1, 1].grid(True, axis='y', alpha=0.3, linestyle='--', color='#30363D')
         
-        # Add value labels on bars
         for bar in bars:
             height = bar.get_height()
             axes[1, 1].text(
@@ -1604,18 +1210,7 @@ class NoventisManualML:
         return plots
 
     def _create_regression_plots(self) -> Dict[str, str]:
-        """
-        Generate comprehensive regression analysis plots.
-        
-        Creates 4-panel visualization:
-        1. Predicted vs Actual scatter plot
-        2. Residuals plot
-        3. Residuals distribution histogram
-        4. Model comparison bar chart
-        
-        Returns:
-            Dictionary with plot name and base64 encoded image
-        """
+        """Generate comprehensive regression analysis plots."""
         plots = {}
         self._set_plot_style()
         
@@ -1623,7 +1218,6 @@ class NoventisManualML:
         y_true = best_result['actual']
         y_pred = best_result['predictions']
         
-        # Create 2x2 subplot grid
         fig, axes = plt.subplots(2, 2, figsize=(16, 14))
         fig.patch.set_facecolor('#0D1117')
         
@@ -1732,7 +1326,6 @@ class NoventisManualML:
         )
         axes[1, 1].grid(True, axis='y', alpha=0.3, linestyle='--', color='#30363D')
         
-        # Add value labels on bars
         for bar in bars:
             height = bar.get_height()
             axes[1, 1].text(
@@ -1748,14 +1341,7 @@ class NoventisManualML:
         return plots
 
     def _create_feature_importance_plot(self) -> str:
-        """
-        Create horizontal bar plot of top 20 feature importances.
-        
-        Only works for tree-based models with feature_importances_ attribute.
-        
-        Returns:
-            Base64 encoded image string, or empty string if not available
-        """
+        """Create horizontal bar plot of top 20 feature importances."""
         try:
             model = self.best_model_info['model']
             
@@ -1764,18 +1350,15 @@ class NoventisManualML:
             
             importances = model.feature_importances_
             
-            # Try to get feature names from preprocessor
             try:
                 feature_names = self.preprocessor.get_feature_names_out()
             except:
                 feature_names = [f'Feature_{i}' for i in range(len(importances))]
             
-            # Get top 20 features
             indices = np.argsort(importances)[::-1][:20]
             top_features = [feature_names[i] for i in indices]
             top_importances = importances[indices]
             
-            # Create plot
             self._set_plot_style()
             
             fig, ax = plt.subplots(figsize=(12, 8))
@@ -1799,7 +1382,6 @@ class NoventisManualML:
             ax.invert_yaxis()
             ax.grid(True, axis='x', alpha=0.3, linestyle='--', color='#30363D')
             
-            # Add value labels
             for i, (bar, val) in enumerate(zip(bars, top_importances)):
                 ax.text(
                     val, i, f' {val:.4f}',
@@ -1815,29 +1397,7 @@ class NoventisManualML:
             return ""
 
     def _get_summary_html(self) -> str:
-        """
-        Generate HTML for summary section of report with detailed information.
-        
-        Args:
-            None
-        
-        Returns:
-            str:
-                Complete HTML string containing:
-                - Process Summary card (task, models, CV settings, cleaner status)
-                - Best Model card (model name, primary metric, training time)
-                - All Metrics card (grid of all evaluation metrics)
-                - Best Hyperparameters card (parameter values in code block)
-                - Dataset Information card (samples, features, distribution)
-                - Data Processing Pipeline card (preprocessing method, cleaner info)
-        
-        Raises:
-            None
-        
-        Example:
-            >>> html = ml._get_summary_html()
-            >>> # Returns HTML with 6 grid cards containing training summary
-        """
+        """Generate HTML for summary section of report."""
         if not self.best_model_info:
             return "<p>No results available to display.</p>"
         
@@ -1871,17 +1431,20 @@ class NoventisManualML:
                 </div>
             """
 
-        # Determine cleaner status
         cleaner_status = "Yes ✓" if self.data_cleaner_used else "No"
         cleaner_color = "#3FB950" if self.data_cleaner_used else "#8B949E"
         
         cleaner_info = ""
         if self.data_cleaner_used and self.cleaner_instance:
             cleaner_type = type(self.cleaner_instance).__name__
-            cleaner_info = f"""
-                <p><strong>Cleaner Type:</strong> {cleaner_type}</p>
-                <p><strong>Cleaner Quality Score:</strong> {self.cleaner_instance.quality_score_.get('final_score', 'N/A')}</p>
-            """
+            try:
+                quality_score = self.cleaner_instance.quality_score_.get('final_score', 'N/A')
+                cleaner_info = f"""
+                    <p><strong>Cleaner Type:</strong> {cleaner_type}</p>
+                    <p><strong>Cleaner Quality Score:</strong> {quality_score}</p>
+                """
+            except:
+                cleaner_info = f"<p><strong>Cleaner Type:</strong> {cleaner_type}</p>"
         elif self.data_cleaner_used and not self.cleaner_instance:
             cleaner_info = "<p><strong>Cleaner Type:</strong> External DataCleaner (type unknown)</p>"
         
@@ -1934,13 +1497,9 @@ class NoventisManualML:
             </div>
         </div>
         """
+
     def _get_comparison_table_html(self) -> str:
-        """
-        Generate HTML comparison table of all trained models.
-        
-        Returns:
-            HTML string with styled DataFrame table
-        """
+        """Generate HTML comparison table of all trained models."""
         df_results = self.get_results_dataframe()
         if df_results.empty:
             return "<p>No model comparison data available.</p>"
@@ -1965,20 +1524,12 @@ class NoventisManualML:
         return f'<div class="table-container">{styled_html}</div>'
 
     def _get_plots_html(self) -> str:
-        """
-        Generate HTML section with all visualizations.
-        
-        Creates task-specific plots, feature importance, and SHAP analysis.
-        
-        Returns:
-            HTML string with embedded base64 encoded images
-        """
+        """Generate HTML section with all visualizations."""
         if self.X_test is None:
             return "<p>Plots cannot be generated because the pipeline has not been run.</p>"
         
         plots_html = ""
         
-        # Task-specific analysis plots
         if self.task_type == 'classification':
             plots = self._create_classification_plots()
             if 'classification_analysis' in plots:
@@ -1998,7 +1549,6 @@ class NoventisManualML:
                     </div>
                 """
         
-        # Feature importance plot
         feature_importance_plot = self._create_feature_importance_plot()
         if feature_importance_plot:
             plots_html += f"""
@@ -2008,7 +1558,6 @@ class NoventisManualML:
                 </div>
             """
         
-        # SHAP analysis plot
         try:
             model_to_explain = self.best_model_info.get('model')
             model_name = self.best_model_info.get('model_name', 'Model').upper()
@@ -2048,7 +1597,7 @@ class NoventisManualML:
         return plots_html
 
     def generate_html_report(self, filepath: Optional[str] = None) -> str:
-        """Generate comprehensive interactive HTML report with FIXED scoping."""
+        """Generate comprehensive interactive HTML report."""
         if not self.best_model_info:
             msg = "Report cannot be generated. Please run the pipeline first using .fit()."
             logging.error(msg)
@@ -2058,7 +1607,6 @@ class NoventisManualML:
         comparison_table_html = self._get_comparison_table_html()
         plots_html = self._get_plots_html()
 
-        # FIXED: Use unique report ID for CSS scoping
         report_id = self._report_id
         
         html_template = f"""
@@ -2229,8 +1777,6 @@ class NoventisManualML:
                     transition: all 0.3s ease;
                     text-shadow: 0 0 25px rgba(255, 184, 108, 0.8);
                 }}
-
-
                 
                 [data-report-id="{report_id}"] .plot-container {{
                     background-color: var(--bg-dark-1);
@@ -2303,6 +1849,7 @@ class NoventisManualML:
                     color: #FFB86C;
                     text-shadow: 0 0 10px rgba(255, 184, 108, 0.5);
                 }}
+                
                 [data-report-id="{report_id}"] .params-box {{
                     background-color: var(--bg-dark-1);
                     border: 1px solid var(--border-color);
@@ -2316,6 +1863,7 @@ class NoventisManualML:
                     max-width: 100%;
                     overflow-x: auto;
                 }}
+                
                 [data-report-id="{report_id}"] .scrollable-box {{
                     max-height: 150px;
                     overflow-y: auto;
@@ -2385,21 +1933,17 @@ class NoventisManualML:
                 function showTab(event, tabName, reportId) {{
                     const reportScope = document.querySelector('[data-report-id="' + reportId + '"]');
                     
-                    // Hide all sections in this report
                     reportScope.querySelectorAll('.content-section').forEach(section => {{
                         section.classList.remove('active');
                     }});
                     
-                    // Remove active class from all buttons
                     reportScope.querySelectorAll('.nav-btn').forEach(btn => {{
                         btn.classList.remove('active');
                     }});
                     
-                    // Show selected section
                     const sectionId = tabName + '-' + reportId;
                     reportScope.querySelector('#' + sectionId).classList.add('active');
                     
-                    // Add active class to clicked button
                     event.currentTarget.classList.add('active');
                 }}
             </script>
@@ -2424,25 +1968,11 @@ class NoventisManualML:
         return html_template
 
     def display_report(self) -> None:
-        """
-        Display HTML report in Jupyter/Colab notebook output cell.
-        
-        Args:
-            None
-        
-        Returns:
-            None
-        
-        Raises:
-            None (logs warning if not in Jupyter/Colab environment)
-        
-        Note:
-            Requires IPython.display module (available in Jupyter/Colab)
-        """
+        """Display HTML report in Jupyter/Colab notebook output cell."""
         logging.info("Preparing report for display in output cell...")
         try:
             html_content = self.generate_html_report()
-            display(HTML(html_content))  # ✅ Langsung gunakan (sudah di-import global)
+            display(HTML(html_content))
             logging.info("Report displayed successfully.")
         except (NameError, ImportError, ModuleNotFoundError) as e:
             logging.warning(
@@ -2465,11 +1995,12 @@ class NoventisManualML:
         models_trained = len([r for r in self.all_results if 'error' not in r])
         
         return (
-            f"ManualPredictor(\n"
+            f"NoventisManualML(\n"
             f"  task='{self.task_type}',\n"
             f"  status='{status}',\n"
             f"  best_model='{best_model}',\n"
-            f"  models_trained={models_trained}\n"
+            f"  models_trained={models_trained},\n"
+            f"  data_cleaner_used={self.data_cleaner_used}\n"
             f")"
         )
 
@@ -2478,7 +2009,3 @@ class NoventisManualML:
         return self.__repr__()
 
 
-# # Module metadata
-# __version__ = "2.0.0"
-# __author__ = "Noventis Team"
-# __all__ = ['ManualPredictor']

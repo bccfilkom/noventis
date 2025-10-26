@@ -520,6 +520,81 @@ class NoventisDataCleaner:
                 'numeric_ratio': f"{(num_cols/total_cols*100):.1f}%" if total_cols > 0 else "0%"
             }
         }
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transform new data using the fitted pipeline components.
+        
+        CRITICAL: This method is required for prediction on new data.
+        Applies all fitted transformations in the same order as fit_transform().
+        
+        Args:
+            X (pd.DataFrame): New data to transform (must have same features as training)
+            
+        Returns:
+            pd.DataFrame: Transformed data
+            
+        Raises:
+            RuntimeError: If pipeline has not been fitted yet
+            TypeError: If X is not a pandas DataFrame
+        """
+        if not self.is_fitted_:
+            raise RuntimeError(
+                "Pipeline has not been fitted yet. "
+                "Call fit_transform() on training data first."
+            )
+        
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("Input 'X' must be a pandas DataFrame.")
+        
+        if self.verbose:
+            print("APPLYING FITTED NOVENTIS PIPELINE TO NEW DATA")
+        
+        df_transformed = X.copy()
+        
+        for step in self.pipeline_steps:
+            if self.verbose:
+                print(f"\nApplying Step: {step.upper()}...")
+            
+            if step == 'impute' and self.imputer_ is not None:
+                if hasattr(self.imputer_, 'transform'):
+                    df_transformed = self.imputer_.transform(df_transformed)
+                else:
+                    if self.verbose:
+                        print(f"  WARNING: Imputer has no transform method, skipping...")
+            
+            elif step == 'outlier' and self.outlier_handler_ is not None:
+                # Outlier handling usually doesn't transform new data
+                # (we don't remove outliers from test data)
+                if hasattr(self.outlier_handler_, 'transform'):
+                    df_transformed = self.outlier_handler_.transform(df_transformed)
+                else:
+                    if self.verbose:
+                        print(f"  INFO: Outlier handler skipped for new data (expected behavior)")
+            
+            elif step == 'encode' and self.encoder_ is not None:
+                if hasattr(self.encoder_, 'transform'):
+                    df_transformed = self.encoder_.transform(df_transformed)
+                else:
+                    if self.verbose:
+                        print(f"  WARNING: Encoder has no transform method, skipping...")
+            
+            elif step == 'scale' and self.scaler_ is not None:
+                if hasattr(self.scaler_, 'transform'):
+                    df_transformed = self.scaler_.transform(df_transformed)
+                else:
+                    if self.verbose:
+                        print(f"  WARNING: Scaler has no transform method, skipping...")
+            
+            if self.verbose:
+                print(f"Step {step.upper()} applied. Shape: {df_transformed.shape}")
+        
+        if self.verbose:
+            print("\nTRANSFORMATION COMPLETE")
+            print("="*50)
+        
+        return df_transformed
+        
     def display_summary_report(self):
         """
         Displays the comprehensive final summary report in the console.
